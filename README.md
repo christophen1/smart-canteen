@@ -47,21 +47,46 @@ smart-canteen/
 mysql -u root -p < docs/sql/schema.sql
 ```
 
-### 3. 配置环境变量
+### 3. 生成测试数据
+
+```bash
+python scripts/generate_data.py     # 生成 data.sql
+mysql -u root -p < scripts/data.sql # 导入数据
+```
+
+### 4. 配置环境变量
 
 ```bash
 cp .env.example .env
 # 编辑 .env，填入 MySQL 密码和 JWT Secret
 ```
 
-### 4. 启动后端
+#### 在 IntelliJ IDEA 中加载 .env
+
+**方法一：EnvFile 插件（推荐）**
+
+1. `File → Settings → Plugins`，搜索 **EnvFile** 并安装
+2. `Run → Edit Configurations`，选中 Spring Boot 启动配置
+3. 在 **EnvFile** 标签页，点 `+` → 选择项目根目录的 `.env` 文件
+4. 勾选 **Enable EnvFile**
+
+**方法二：手动填入 Environment variables**
+
+1. `Run → Edit Configurations`，选中 Spring Boot 启动配置
+2. 在 **Environment variables** 输入框里粘贴（格式：`KEY=VALUE;KEY2=VALUE2`）：
+
+```
+DB_PASSWORD=你的密码;JWT_SECRET=随便写一串英文
+```
+
+### 5. 启动后端
 
 ```bash
 cd springboot-backend
 mvn spring-boot:run
 ```
 
-### 5. 运行 API 测试
+### 6. 运行 API 测试
 
 ```bash
 pip install requests
