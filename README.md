@@ -78,4 +78,3 @@ python scripts/test_api.py
 
 - `.env` 文件包含敏感信息，已加入 `.gitignore`，不提交
 - `.env.example` 为模板文件，组员复制后填入自己的配置
-- `.claude/` 目录为 AI 工具配置，已忽略，不提交
