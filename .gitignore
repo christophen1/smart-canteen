@@ -42,5 +42,10 @@ build/
 application-local.yml
 **/application-local.yml
 
+### Python ###
+.venv/
+**/__pycache__/
+*.py[cod]
+
 ### Generated ###
 scripts/data.sql
