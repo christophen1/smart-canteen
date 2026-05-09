@@ -63,12 +63,13 @@ cp .env.example .env
 
 #### 在 IntelliJ IDEA 中加载 .env
 
-**方法一：EnvFile 插件（推荐）**
+**方法一：直接用IDEA配置**
 
-1. `File → Settings → Plugins`，搜索 **EnvFile** 并安装
-2. `Run → Edit Configurations`，选中 Spring Boot 启动配置
-3. 在 **EnvFile** 标签页，点 `+` → 选择项目根目录的 `.env` 文件
-4. 勾选 **Enable EnvFile**
+1. IDEA 右上角直接点击 `Edit Configurations`
+2. 点击修改选项，勾选 `环境变量`
+3. `环境变量` 标签选中.env文件
+4. 确定
+
 
 **方法二：手动填入 Environment variables**
 
