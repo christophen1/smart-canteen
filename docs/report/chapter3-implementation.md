@@ -129,23 +129,87 @@ public class JwtInterceptor implements HandlerInterceptor {
 - 取消：校验归属权 + 仅待支付状态可取消
 - 管理员改状态：支持 已取消/待支付/已支付/已完成 四个状态流转
 
-### 3.2.3 PySpark 分析模块实现
+### 3.2.3 分析结果查询 API 实现
 
-- 客流分析脚本实现
-- 高峰时段分析脚本实现
-- 菜品销量分析脚本实现
-- 备餐预测脚本实现
+PySpark 将分析结果写入 MySQL 后，后端需要提供 REST API 供前端查询展示。B成员为 4 张分析结果表分别建立了完整的 Entity → Mapper → Service → Controller 四层。
 
-### 3.2.4 前端实现
+**4 个分析结果实体类**：
 
-- 用户端页面
-- 管理端页面
-- 数据可视化页面
+| 实体类 | 对应表 | 核心字段 |
+|--------|--------|----------|
+| `CustomerFlowAnalysis` | customer_flow_analysis | analysisDate, dailyOrders, dailyAmount, avgOrderAmount, totalUsers |
+| `PeakHourAnalysis` | peak_hour_analysis | analysisDate, hour, orderCount, totalAmount |
+| `DishSalesAnalysis` | dish_sales_analysis | analysisDate, dishId, dishName, salesCount, salesAmount |
+| `MealPrediction` | meal_prediction | predictDate, dishId, dishName, predictedSales, suggestedPrepare, confidence |
 
-### 3.2.5 前后端联调
+所有实体类使用 `@TableName` 映射表名、`@TableId(type = IdType.AUTO)` 标记自增主键，字段类型使用 `LocalDate` 映射日期、`BigDecimal` 映射金额。
 
-- API 对接测试
-- 数据流验证
+**Mapper 层**：4 个 Mapper 接口均继承 `BaseMapper<T>`，利用 MyBatis Plus 自动生成 CRUD 方法，无需编写任何 SQL。
+
+**Service 层**：`AnalysisService` 接口定义 4 个分页查询方法，`AnalysisServiceImpl` 实现类使用 `LambdaQueryWrapper` 构建类型安全的动态查询条件：
+- 客流分析、高峰分析、菜品销量：支持 `startDate` / `endDate` 日期范围过滤
+- 备餐预测：支持按 `predictDate` 精确查询
+- 所有查询结果按业务需求排序（如客流按日期倒序、菜品销量按销量倒序）
+
+**Controller 层**：`AnalysisController` 注册在 `/api/analysis` 路径下：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/analysis/customer-flow` | GET | 分页查询客流分析，可选日期范围过滤 |
+| `/api/analysis/peak-hour` | GET | 分页查询高峰时段分析，可选日期范围过滤 |
+| `/api/analysis/dish-sales` | GET | 分页查询菜品销量分析，可选日期范围过滤 |
+| `/api/analysis/prediction` | GET | 分页查询备餐预测，可选预测日期过滤 |
+
+所有端点均要求 JWT 认证（通过 JwtInterceptor 拦截），支持 `page`、`size` 分页参数，日期参数使用 `@DateTimeFormat(iso = DateTimeFormat.ISO.DATE)` 自动解析 `yyyy-MM-dd` 格式。
+
+### 3.2.4 PySpark 分析模块实现
+
+**整体流程**：`main.py` 作为总入口，依次初始化 SparkSession、执行 4 个分析任务、关闭 SparkSession。Windows 环境下通过 `os.environ['HADOOP_HOME'] = 'C:\\fake'` 规避 Hadoop 文件系统兼容问题。所有分析脚本均使用中文注释，方便课程报告展示。
+
+**客流分析 (customer_flow.py)**：
+1. 通过 JDBC 读取 orders 表为 DataFrame
+2. `filter(col("is_deleted") == 0)` 过滤已删除订单
+3. `groupBy(date_format("create_time", "yyyy-MM-dd"))` 按日期分组
+4. `agg(count("id"), sum("total_amount"), countDistinct("user_id"))` 聚合统计
+5. `withColumn("avg_order_amount", col("daily_amount") / col("daily_orders"))` 计算客单价
+6. `write.jdbc(mode="overwrite")` 写入 customer_flow_analysis 表
+
+**高峰时段分析 (peak_hour.py)**：
+1. 读取 orders 表并过滤已删除订单
+2. `groupBy(date_format("create_time"), hour("create_time"))` 按日期+小时双维度分组
+3. 聚合订单数和销售额
+4. 写入 peak_hour_analysis 表
+
+**菜品销量分析 (dish_sales.py)**：
+1. 读取 orders 和 order_item 两张表
+2. 使用别名 JOIN（`oi.order_id == o.id`），选择 create_time、dish_id、dish_name、quantity、dish_price
+3. 按日期+菜品分组聚合销量和销售额
+4. 使用 `Window.partitionBy("analysis_date").orderBy(col("sales_count").desc())` + `row_number()` 取每日 TOP10
+5. 写入 dish_sales_analysis 表
+
+**备餐预测 (meal_prediction.py)**：
+1. 读取 dish_sales_analysis 历史数据
+2. `to_date(col("analysis_date"), "yyyy-MM-dd")` 将字符串转为日期类型
+3. 为每个菜品添加 7 个 `lag("sales_count", n)` 滞后列，获取过去 1-7 天销量
+4. 计算 7 日移动平均作为 `predicted_sales`
+5. `suggested_prepare = predicted_sales * 1.2`（20% 安全冗余）
+6. 使用 `when(col("predicted_sales").isNotNull(), ...).otherwise(0)` 处理历史数据不足的边界情况
+7. 过滤最新日期数据，预测明天，写入 meal_prediction 表
+
+### 3.2.5 测试脚本优化
+
+`scripts/test_api.py` 新增 `test_analysis_apis()` 函数，对 4 个分析结果查询接口进行覆盖测试：
+- 分别使用普通用户 token 和管理员 token 请求所有分析端点
+- 验证分页参数 `page` 和 `size` 生效
+- 验证未登录访问返回 401 被拦截
+
+同时优化了管理员注册流程：通过 `subprocess` 调用 MySQL 命令行自动设置 `role = 1`，替代原来的手动 SQL 提示，实现全自动测试。
+
+`scripts/generate_data.py` 修复了订单明细数量统计 bug：独立的 `order_item_count` 计数器替代了原来错误的 `order_id - 1` 取值。
+
+### 3.2.6 前端实现
+
+> 前端页面和前后端联调待 Vue 前端开发完成后补充。
 
 ---
 
