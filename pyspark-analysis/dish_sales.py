@@ -1,49 +1,60 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, date_format, sum
+from pyspark.sql.functions import col, date_format, sum, row_number
+from pyspark.sql.window import Window
 import config
 
-def analyze_dish_sales(spark):
-    # Read orders and order_item tables
-    orders_df = spark.read.jdbc(url=config.JDBC_URL, table="orders", properties=config.JDBC_PROPERTIES)
-    order_item_df = spark.read.jdbc(url=config.JDBC_URL, table="order_item", properties=config.JDBC_PROPERTIES)
 
-    # Filter out deleted orders
+def analyze_dish_sales(spark):
+    # 从 MySQL 读取订单表和订单明细表
+    orders_df = spark.read.jdbc(url=config.JDBC_URL, table="orders",
+                                properties=config.JDBC_PROPERTIES)
+    order_item_df = spark.read.jdbc(url=config.JDBC_URL, table="order_item",
+                                    properties=config.JDBC_PROPERTIES)
+
+    # 过滤已删除的订单
     orders_df = orders_df.filter(col("is_deleted") == 0)
 
-    # Join order_item with orders on order_id
-    joined_df = order_item_df.join(orders_df, order_item_df.order_id == orders_df.id)
+    # 关联订单表和订单明细表，获取所需字段
+    joined_df = order_item_df.alias("oi").join(
+        orders_df.alias("o"),
+        col("oi.order_id") == col("o.id")
+    ).select(
+        col("o.create_time"),
+        col("oi.dish_id"),
+        col("oi.dish_name"),
+        col("oi.quantity"),
+        col("oi.dish_price")
+    )
 
-    # Group by date and dish_id
+    # 按日期和菜品分组统计销量和销售额
     dish_sales_df = joined_df.groupBy(
-        date_format(orders_df.create_time, "yyyy-MM-dd").alias("analysis_date"),
-        order_item_df.dish_id,
-        order_item_df.dish_name
-    ) \
-    .agg(
-        sum(order_item_df.quantity).alias("sales_count"),
-        sum(order_item_df.dish_price * order_item_df.quantity).alias("sales_amount")
-    ) \
-    .select("analysis_date", "dish_id", "dish_name", "sales_count", "sales_amount")
+        date_format(col("create_time"), "yyyy-MM-dd").alias("analysis_date"),
+        col("dish_id"),
+        col("dish_name")
+    ).agg(
+        sum(col("quantity")).alias("sales_count"),      # 销量
+        sum(col("dish_price") * col("quantity")).alias("sales_amount")  # 销售额
+    ).select("analysis_date", "dish_id", "dish_name", "sales_count", "sales_amount")
 
-    # Get top 10 by sales_count per date (assuming we want top 10 per day)
-    # For simplicity, get overall top 10, but PRD says per day/week/month, adjust as needed
-    # Here, I'll assume per day
-    from pyspark.sql.window import Window
-    from pyspark.sql.functions import row_number
+    # 按日期分组，取销量 TOP10 的菜品
+    window_spec = Window.partitionBy("analysis_date") \
+        .orderBy(col("sales_count").desc())
+    top_dish_sales_df = dish_sales_df.withColumn(
+        "rank", row_number().over(window_spec)
+    ).filter(col("rank") <= 10).drop("rank")
 
-    window_spec = Window.partitionBy("analysis_date").orderBy(col("sales_count").desc())
-    top_dish_sales_df = dish_sales_df.withColumn("rank", row_number().over(window_spec)) \
-        .filter(col("rank") <= 10) \
-        .drop("rank")
+    # 将分析结果写入数据库
+    top_dish_sales_df.write.jdbc(
+        url=config.JDBC_URL, table="dish_sales_analysis",
+        mode="overwrite", properties=config.JDBC_PROPERTIES
+    )
 
-    # Write to dish_sales_analysis table
-    top_dish_sales_df.write.jdbc(url=config.JDBC_URL, table="dish_sales_analysis", mode="overwrite", properties=config.JDBC_PROPERTIES)
+    print("菜品销量分析完成。")
 
-    print("Dish sales analysis completed.")
 
 if __name__ == "__main__":
     spark = SparkSession.builder \
-        .appName("Dish Sales Analysis") \
+        .appName("菜品销量分析") \
         .config("spark.jars", config.MYSQL_JAR_PATH) \
         .getOrCreate()
 
