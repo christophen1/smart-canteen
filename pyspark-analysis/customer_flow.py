@@ -22,10 +22,11 @@ def analyze_customer_flow(spark):
     ).select("analysis_date", "daily_orders", "daily_amount",
              "avg_order_amount", "total_users")
 
-    # 将分析结果写入数据库
+    # 将分析结果写入数据库（使用 truncate 保留表结构）
+    write_props = {**config.JDBC_PROPERTIES, "truncate": "true"}
     customer_flow_df.write.jdbc(
         url=config.JDBC_URL, table="customer_flow_analysis",
-        mode="overwrite", properties=config.JDBC_PROPERTIES
+        mode="overwrite", properties=write_props
     )
 
     print("客流分析完成。")

@@ -43,10 +43,11 @@ def analyze_dish_sales(spark):
         "rank", row_number().over(window_spec)
     ).filter(col("rank") <= 10).drop("rank")
 
-    # 将分析结果写入数据库
+    # 将分析结果写入数据库（使用 truncate 保留表结构）
+    write_props = {**config.JDBC_PROPERTIES, "truncate": "true"}
     top_dish_sales_df.write.jdbc(
         url=config.JDBC_URL, table="dish_sales_analysis",
-        mode="overwrite", properties=config.JDBC_PROPERTIES
+        mode="overwrite", properties=write_props
     )
 
     print("菜品销量分析完成。")

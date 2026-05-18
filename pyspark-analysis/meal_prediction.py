@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, date_add, lag, when, lit
+from pyspark.sql.functions import col, to_date, date_add, lag, when, lit, max
 from pyspark.sql.window import Window
 import config
 from datetime import datetime, timedelta
@@ -16,9 +16,19 @@ def predict_meals(spark):
         to_date(col("analysis_date"), "yyyy-MM-dd")
     )
 
-    # 获取昨天和明天的日期
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    # 获取数据中的最大日期（最近有数据的日期）作为基准
+    max_date_row = sales_df.agg(max("analysis_date")).collect()[0][0]
+    if max_date_row is None:
+        print("没有历史数据，跳过备餐预测。")
+        return
+
+    base_date = max_date_row.strftime("%Y-%m-%d")
+    # 预测日期 = 基准日期 + 1 天
+    from datetime import timedelta
+    predict_date_obj = max_date_row + timedelta(days=1)
+    predict_date_str = predict_date_obj.strftime("%Y-%m-%d")
+
+    print(f"基于 {base_date} 的数据预测 {predict_date_str} 的销量")
 
     # 定义窗口：按菜品分组，按日期排序
     window_spec = Window.partitionBy("dish_id").orderBy("analysis_date")
@@ -39,9 +49,9 @@ def predict_meals(spark):
          + col("prev_5") + col("prev_6") + col("prev_7")) / 7
     )
 
-    # 基于最新数据预测明天的销量
-    prediction_df = sales_df.filter(col("analysis_date") == yesterday) \
-        .withColumn("predict_date", to_date(lit(tomorrow), "yyyy-MM-dd")) \
+    # 基于最近有数据的日期预测下一天的销量
+    prediction_df = sales_df.filter(col("analysis_date") == base_date) \
+        .withColumn("predict_date", to_date(lit(predict_date_str), "yyyy-MM-dd")) \
         .withColumn("predicted_sales", col("moving_avg")) \
         .withColumn(
             "suggested_prepare",
@@ -55,13 +65,14 @@ def predict_meals(spark):
         .select("predict_date", "dish_id", "dish_name",
                 "predicted_sales", "suggested_prepare", "confidence")
 
-    # 将预测结果写入数据库
+    # 将预测结果写入数据库（使用 truncate 保留表结构）
+    write_props = {**config.JDBC_PROPERTIES, "truncate": "true"}
     prediction_df.write.jdbc(
         url=config.JDBC_URL, table="meal_prediction",
-        mode="overwrite", properties=config.JDBC_PROPERTIES
+        mode="overwrite", properties=write_props
     )
 
-    print("备餐预测完成。")
+    print(f"备餐预测完成，共 {prediction_df.count()} 条预测记录。")
 
 
 if __name__ == "__main__":

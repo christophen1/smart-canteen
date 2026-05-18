@@ -55,38 +55,26 @@ orders_df = spark.read.jdbc(
 #### 窗口函数实现备餐预测
 
 ```python
-from pyspark.sql.functions import col, lag, when, to_date, lit
+from pyspark.sql.functions import col, avg, ceil
 from pyspark.sql.window import Window
 
-# 定义窗口：按菜品分组，按日期排序
-window_spec = Window.partitionBy("dish_id").orderBy("analysis_date")
+# 7 天滑动窗口
+window_spec = Window.partitionBy("dish_id") \
+    .orderBy("analysis_date") \
+    .rowsBetween(-6, 0)
 
-# 添加过去 7 天的销量滞后列
-dish_sales_df = dish_sales_df.withColumn("prev_1", lag("sales_count", 1).over(window_spec))
-dish_sales_df = dish_sales_df.withColumn("prev_2", lag("sales_count", 2).over(window_spec))
-# ... prev_3 到 prev_7 同理
+# 计算 7 日移动平均作为预测值
+prediction_df = dish_sales_df \
+    .withColumn("predicted_sales", ceil(avg("sales_count").over(window_spec))) \
+    .withColumn("suggested_prepare", ceil(col("predicted_sales") * 1.2))
 
-# 计算 7 日移动平均作为预测销量
-prediction_df = dish_sales_df.withColumn(
-    "moving_avg",
-    (col("prev_1") + col("prev_2") + col("prev_3") + col("prev_4")
-     + col("prev_5") + col("prev_6") + col("prev_7")) / 7
-).withColumn(
-    "suggested_prepare",
-    when(col("moving_avg").isNotNull(),
-         (col("moving_avg") * 1.2).cast("int")).otherwise(0)
-).withColumn(
-    "confidence",
-    when(col("moving_avg").isNotNull(), 0.8).otherwise(0.0)
+# 写入 MySQL
+prediction_df.write.jdbc(
+    url="jdbc:mysql://localhost:3306/smart_canteen",
+    table="meal_prediction",
+    mode="append",
+    properties=db_properties
 )
-
-# 预测明天数据并写入 MySQL
-prediction_df.filter(col("analysis_date") == yesterday) \
-    .withColumn("predict_date", to_date(lit(tomorrow), "yyyy-MM-dd")) \
-    .select("predict_date", "dish_id", "dish_name",
-            "predicted_sales", "suggested_prepare", "confidence") \
-    .write.jdbc(url=JDBC_URL, table="meal_prediction",
-                mode="overwrite", properties=JDBC_PROPERTIES)
 ```
 
 ---
@@ -94,9 +82,9 @@ prediction_df.filter(col("analysis_date") == yesterday) \
 ## 4.2 其他技术总结
 ### 4.2.1 SpringBoot 后端技术
 
-- **Spring MVC**：基于注解的 RESTful API 开发，Controller-Service-Mapper 三层架构。业务模块（用户/菜品/订单/分类）和外部分析模块（客流/高峰/销量/预测）均遵循统一的分层架构
-- **MyBatis Plus**：通过 `BaseMapper<T>` 继承实现零 SQL 的 CRUD 操作；条件构造器 `LambdaQueryWrapper` 实现类型安全的动态查询，分析结果 API 使用 `ge()`/`le()`/`eq()` 方法实现日期范围过滤和精确查询
-- **JWT 认证**：使用 `jjwt` 库生成和验证 token，通过拦截器对受保护接口进行认证；管理员接口额外校验角色权限。分析结果 API 复用 JwtInterceptor 进行统一认证，普通用户和管理员均可访问
+- **Spring MVC**：基于注解的 RESTful API 开发，Controller-Service-Mapper 三层架构
+- **MyBatis Plus**：通过 `BaseMapper<T>` 继承实现零 SQL 的 CRUD 操作；条件构造器 `LambdaQueryWrapper` 实现类型安全的动态查询
+- **JWT 认证**：使用 `jjwt` 库生成和验证 token，通过拦截器对受保护接口进行认证；管理员接口额外校验角色权限
 - **Redis 缓存**：对菜品列表、分类列表等高频读取数据使用 Redis 缓存，减少数据库压力
 - **全局异常处理**：`@RestControllerAdvice` + `@ExceptionHandler` 统一处理各类异常，保证 API 返回格式一致
 

@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 # 从 .env 文件加载环境变量
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
 # 数据库配置
 DB_CONFIG = {
@@ -24,4 +24,4 @@ JDBC_PROPERTIES = {
 }
 
 # MySQL Connector/J JAR 文件路径（JAR 已存在于 lib 目录）
-MYSQL_JAR_PATH = "lib/mysql-connector-j-9.7.0.jar"
+MYSQL_JAR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib/mysql-connector-j-9.7.0.jar")

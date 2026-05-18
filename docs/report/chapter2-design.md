@@ -232,38 +232,25 @@ LIMIT 10
 
 **Spark 编程要点**：
 - 读取 dish_sales_analysis 历史数据
-- 使用 `to_date()` 将字符串日期转换为日期类型
-- 使用 `lag("sales_count", n)` 窗口函数获取过去 1-7 天的销量
-- 计算 7 日移动平均值作为预测销量
-- 使用 `when().otherwise()` 处理历史数据不足的边界情况
+- 使用 `Window.partitionBy("dish_id").orderBy("analysis_date").rowsBetween(-6, 0)` 定义 7 天滑动窗口
+- 使用 `avg()` 窗口函数计算 7 日移动平均作为预测值
 - `建议备餐量 = 预测销量 * 1.2`（20% 安全冗余）
 - 写入 meal_prediction 表
 
 **关键 Spark 代码结构**：
 ```python
 from pyspark.sql.window import Window
-from pyspark.sql.functions import col, lag, when, lit, to_date
 
-# 定义窗口：按菜品分组，按日期排序
-window_spec = Window.partitionBy("dish_id").orderBy("analysis_date")
+window_spec = Window.partitionBy("dish_id") \
+    .orderBy("analysis_date") \
+    .rowsBetween(-6, 0)
 
-# 添加过去7天的 lag 列
-for i in range(1, 8):
-    dish_sales_df = dish_sales_df.withColumn(
-        f"prev_{i}", lag("sales_count", i).over(window_spec)
-    )
-
-# 计算 7 日移动平均
 prediction_df = dish_sales_df.withColumn(
-    "moving_avg",
-    (col("prev_1") + col("prev_2") + col("prev_3") + col("prev_4")
-     + col("prev_5") + col("prev_6") + col("prev_7")) / 7
-).withColumn(
-    "predicted_sales", col("moving_avg")
+    "predicted_sales",
+    ceil(avg("sales_count").over(window_spec))
 ).withColumn(
     "suggested_prepare",
-    when(col("predicted_sales").isNotNull(),
-         (col("predicted_sales") * 1.2).cast("int")).otherwise(0)
+    ceil(col("predicted_sales") * 1.2)
 )
 ```
 
@@ -271,45 +258,15 @@ prediction_df = dish_sales_df.withColumn(
 
 ```python
 # config.py
-import os
-from dotenv import load_dotenv
-
-load_dotenv()  # 从 .env 文件加载环境变量
-
-DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '3306'),
-    'database': os.getenv('DB_NAME', 'smart_canteen'),
-    'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', ''),
-}
-
-JDBC_URL = (f"jdbc:mysql://{DB_CONFIG['host']}:{DB_CONFIG['port']}/"
-            f"{DB_CONFIG['database']}?useSSL=false&serverTimezone=UTC")
-
-JDBC_PROPERTIES = {
-    "user": DB_CONFIG["user"],
-    "password": DB_CONFIG["password"],
+JDBC_URL = "jdbc:mysql://localhost:3306/smart_canteen"
+DB_PROPERTIES = {
+    "user": "root",
+    "password": "xxx",    # 实际从环境变量读取
     "driver": "com.mysql.cj.jdbc.Driver"
 }
-
-# MySQL Connector/J JAR 文件路径
-MYSQL_JAR_PATH = "lib/mysql-connector-j-9.7.0.jar"
 ```
 
-Spark 读取 MySQL 时通过 `spark.jars` 配置加载 MySQL JDBC 驱动。Windows 环境下还需设置 `HADOOP_HOME` 环境变量以规避文件系统兼容问题。
-
-**main.py 入口脚本关键配置**：
-```python
-os.environ['HADOOP_HOME'] = 'C:\\fake'  # Windows 兼容
-
-spark = SparkSession.builder \
-    .appName("校园食堂数据分析") \
-    .master("local[*]") \
-    .config("spark.jars", config.MYSQL_JAR_PATH) \
-    .config("spark.sql.adaptive.enabled", "true") \
-    .getOrCreate()
-```
+Spark 读取 MySQL 时需要 `mysql-connector-java` jar 包，启动时通过 `--jars` 参数传入或放入 Spark 的 jars 目录。
 
 ---
 

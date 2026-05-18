@@ -23,10 +23,7 @@ smart-canteen/
 ├── pyspark-analysis/       # PySpark 离线分析（Python）
 ├── vue-frontend/           # Vue 前端
 ├── scripts/                # 脚本
-│   ├── test_api.py         # API 全接口测试脚本
-│   └── generate_data.py    # 测试数据生成
-├── lib/                    # 依赖 JAR
-│   └── mysql-connector-j-9.7.0.jar
+│   └── test_api.py         # API 测试脚本
 ├── docs/                   # 文档
 │   ├── PRD.md              # 产品需求文档
 │   ├── sql/schema.sql      # 建表脚本
@@ -90,33 +87,12 @@ cd springboot-backend
 mvn spring-boot:run
 ```
 
-### 6. 运行 PySpark 离线分析
-
-```bash
-cd pyspark-analysis
-pip install pyspark python-dotenv
-python main.py
-```
-
-分析任务：客流分析 → 高峰时段分析 → 菜品销量分析 → 备餐预测。结果通过 JDBC 写入 MySQL 分析结果表，由后端 `/api/analysis/*` 接口提供查询。
-
-### 7. 运行 API 测试
+### 6. 运行 API 测试
 
 ```bash
 pip install requests
 python scripts/test_api.py
 ```
-
-## 分析结果 API
-
-| 端点 | 说明 |
-|------|------|
-| `GET /api/analysis/customer-flow` | 客流分析（分页 + 日期范围过滤） |
-| `GET /api/analysis/peak-hour` | 高峰时段分析（分页 + 日期范围过滤） |
-| `GET /api/analysis/dish-sales` | 菜品销量 TOP10（分页 + 日期范围过滤） |
-| `GET /api/analysis/prediction` | 备餐预测（分页 + 预测日期过滤） |
-
-所有分析接口需 JWT 认证，支持 `page`/`size` 分页参数。
 
 ## 文档
 

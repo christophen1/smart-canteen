@@ -19,10 +19,11 @@ def analyze_peak_hour(spark):
         sum("total_amount").alias("total_amount")  # 每小时销售额
     ).select("analysis_date", "hour", "order_count", "total_amount")
 
-    # 将分析结果写入数据库
+    # 将分析结果写入数据库（使用 truncate 保留表结构）
+    write_props = {**config.JDBC_PROPERTIES, "truncate": "true"}
     peak_hour_df.write.jdbc(
         url=config.JDBC_URL, table="peak_hour_analysis",
-        mode="overwrite", properties=config.JDBC_PROPERTIES
+        mode="overwrite", properties=write_props
     )
 
     print("高峰时段分析完成。")
