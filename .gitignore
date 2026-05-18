@@ -49,3 +49,8 @@ application-local.yml
 
 ### Generated ###
 scripts/data.sql
+
+### Frontend ###
+node_modules/
+**/node_modules/
+vue-frontend/dist/
