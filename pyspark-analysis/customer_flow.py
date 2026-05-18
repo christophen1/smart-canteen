@@ -1,9 +1,24 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, date_format, count, sum, countDistinct
 import config
+import mysql.connector
 
 
 def analyze_customer_flow(spark):
+    # 先清空表数据
+    conn = mysql.connector.connect(
+        host=config.DB_CONFIG['host'],
+        port=int(config.DB_CONFIG['port']),
+        database=config.DB_CONFIG['database'],
+        user=config.DB_CONFIG['user'],
+        password=config.DB_CONFIG['password']
+    )
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM customer_flow_analysis")
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
     # 从 MySQL 读取订单表数据
     orders_df = spark.read.jdbc(url=config.JDBC_URL, table="orders",
                                 properties=config.JDBC_PROPERTIES)
@@ -22,11 +37,10 @@ def analyze_customer_flow(spark):
     ).select("analysis_date", "daily_orders", "daily_amount",
              "avg_order_amount", "total_users")
 
-    # 将分析结果写入数据库（使用 truncate 保留表结构）
-    write_props = {**config.JDBC_PROPERTIES, "truncate": "true"}
+    # 使用追加模式写入，避免覆盖表结构
     customer_flow_df.write.jdbc(
         url=config.JDBC_URL, table="customer_flow_analysis",
-        mode="overwrite", properties=write_props
+        mode="append", properties=config.JDBC_PROPERTIES
     )
 
     print("客流分析完成。")

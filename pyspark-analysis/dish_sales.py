@@ -2,9 +2,24 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, date_format, sum, row_number
 from pyspark.sql.window import Window
 import config
+import mysql.connector
 
 
 def analyze_dish_sales(spark):
+    # 先清空表数据
+    conn = mysql.connector.connect(
+        host=config.DB_CONFIG['host'],
+        port=int(config.DB_CONFIG['port']),
+        database=config.DB_CONFIG['database'],
+        user=config.DB_CONFIG['user'],
+        password=config.DB_CONFIG['password']
+    )
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM dish_sales_analysis")
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
     # 从 MySQL 读取订单表和订单明细表
     orders_df = spark.read.jdbc(url=config.JDBC_URL, table="orders",
                                 properties=config.JDBC_PROPERTIES)
@@ -43,11 +58,10 @@ def analyze_dish_sales(spark):
         "rank", row_number().over(window_spec)
     ).filter(col("rank") <= 10).drop("rank")
 
-    # 将分析结果写入数据库（使用 truncate 保留表结构）
-    write_props = {**config.JDBC_PROPERTIES, "truncate": "true"}
+    # 使用追加模式写入，避免覆盖表结构
     top_dish_sales_df.write.jdbc(
         url=config.JDBC_URL, table="dish_sales_analysis",
-        mode="overwrite", properties=write_props
+        mode="append", properties=config.JDBC_PROPERTIES
     )
 
     print("菜品销量分析完成。")
