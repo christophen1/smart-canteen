@@ -35,20 +35,12 @@ const loading = ref(false)
 const visible = ref(false)
 const categories = ref([])
 const form = reactive({ id: null, name: '', sort: 0 })
-const demoCategories = [
-  { id: 1, name: '主食套餐', sort: 1 },
-  { id: 2, name: '热炒小碗', sort: 2 },
-  { id: 3, name: '汤粉面', sort: 3 },
-  { id: 4, name: '饮品小吃', sort: 4 },
-]
-
 async function load() {
   loading.value = true
   try {
-    const records = await api.categories()
-    categories.value = records.length ? records : demoCategories
+    categories.value = await api.categories()
   } catch {
-    categories.value = demoCategories
+    categories.value = []
   } finally {
     loading.value = false
   }

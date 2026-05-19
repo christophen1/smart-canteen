@@ -3,6 +3,8 @@ package com.datastructure.smartcanteen.controller.admin;
 import com.datastructure.smartcanteen.common.Result;
 import com.datastructure.smartcanteen.entity.Dish;
 import com.datastructure.smartcanteen.service.DishService;
+import com.datastructure.smartcanteen.vo.DishVO;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +16,13 @@ import java.util.Map;
 public class AdminDishController {
 
     private final DishService dishService;
+
+    @GetMapping("/page")
+    public Result<Page<DishVO>> page(@RequestParam(defaultValue = "1") int page,
+                                     @RequestParam(defaultValue = "10") int size,
+                                     @RequestParam(required = false) String keyword) {
+        return Result.success(dishService.pageForAdmin(page, size, keyword));
+    }
 
     @PostMapping
     public Result<Void> save(@RequestBody Dish dish) {

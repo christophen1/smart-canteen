@@ -8,6 +8,8 @@ public interface DishService {
 
     Page<DishVO> page(int page, int size, String keyword);
 
+    Page<DishVO> pageForAdmin(int page, int size, String keyword);
+
     DishVO getById(Long id);
 
     void save(Dish dish);

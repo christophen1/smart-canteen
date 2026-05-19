@@ -29,21 +29,13 @@ import { money, pageRecords, statusText } from '../../utils/format'
 
 const loading = ref(false)
 const orders = ref([])
-const demoOrders = [
-  { id: 101, orderNo: 'SC202605180001', userId: 12, totalAmount: 48, status: 2, remark: '午餐 12:10 取餐', createTime: '2026-05-18 11:42:08' },
-  { id: 102, orderNo: 'SC202605180002', userId: 27, totalAmount: 30, status: 1, remark: '少辣', createTime: '2026-05-18 12:05:31' },
-  { id: 103, orderNo: 'SC202605180003', userId: 8, totalAmount: 56, status: 3, remark: '窗口自取', createTime: '2026-05-18 12:18:45' },
-  { id: 104, orderNo: 'SC202605170018', userId: 19, totalAmount: 26, status: 4, remark: '晚餐', createTime: '2026-05-17 18:17:44' },
-]
-
 async function load() {
   loading.value = true
   try {
     const page = await api.adminOrders({ page: 1, size: 100 })
-    const records = pageRecords(page)
-    orders.value = records.length ? records : demoOrders
+    orders.value = pageRecords(page)
   } catch {
-    orders.value = demoOrders
+    orders.value = []
   } finally {
     loading.value = false
   }

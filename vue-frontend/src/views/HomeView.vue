@@ -39,7 +39,7 @@
           <h2 class="section-title">今日菜品</h2>
           <span class="muted">按分类浏览、搜索并加入购物车</span>
         </div>
-        <el-tag type="success" size="large">演示数据可离线预览</el-tag>
+        <el-tag type="success" size="large">实时接口数据</el-tag>
       </div>
       <el-tabs v-model="activeCategory" @tab-change="loadDishes">
         <el-tab-pane label="全部" name="" />
@@ -76,23 +76,11 @@ import { useCart } from '../stores/cart'
 import { money, pageRecords } from '../utils/format'
 
 const fallbackImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'
-const demoCategories = [
-  { id: 1, name: '主食套餐' },
-  { id: 2, name: '热炒小碗' },
-  { id: 3, name: '汤粉面' },
-  { id: 4, name: '饮品小吃' },
-]
-const demoDishes = [
-  { id: 1, categoryId: 1, categoryName: '主食套餐', name: '红烧牛肉饭', price: 18, description: 'Spark 预测今日销量 86 份，建议备餐 104 份。', image: '/demo/beef-rice.png' },
-  { id: 2, categoryId: 1, categoryName: '主食套餐', name: '香煎鸡腿套餐', price: 20, description: '午餐高峰热销，适合提前备餐。', image: '/demo/chicken-set.png' },
-  { id: 3, categoryId: 3, categoryName: '汤粉面', name: '番茄鸡蛋面', price: 12, description: '近 7 日移动平均销量稳定。', image: '/demo/tomato-noodle.png' },
-  { id: 4, categoryId: 2, categoryName: '热炒小碗', name: '麻婆豆腐', price: 10, description: '晚餐时段订单占比更高。', image: '/demo/mapo-tofu.png' },
-]
-const sparkCards = [
+const sparkCards = ref([
   { label: '客流峰值', value: '12:00' },
   { label: '预测订单', value: '238 单' },
   { label: '需补备餐', value: '3 项' },
-]
+])
 
 const loading = ref(false)
 const keyword = ref('')
@@ -106,7 +94,7 @@ async function loadCategories() {
   try {
     categories.value = await api.categories()
   } catch {
-    categories.value = demoCategories
+    categories.value = []
   }
 }
 
@@ -114,15 +102,32 @@ async function loadDishes() {
   loading.value = true
   try {
     const page = await api.dishes({ page: 1, size: 100, keyword: keyword.value || undefined })
-    const records = pageRecords(page)
-    dishes.value = records.length ? records : demoDishes
+    dishes.value = pageRecords(page)
   } catch {
-    dishes.value = demoDishes.filter((dish) => !keyword.value || dish.name.includes(keyword.value))
+    dishes.value = []
   } finally {
     dishes.value = activeCategory.value
       ? dishes.value.filter((dish) => String(dish.categoryId) === activeCategory.value)
       : dishes.value
     loading.value = false
+  }
+}
+
+async function loadSummary() {
+  try {
+    const summary = await api.analysisSummary()
+    const predictions = summary.predictions || []
+    sparkCards.value = [
+      { label: '客流峰值', value: summary.peakHour || '--' },
+      { label: '最近订单', value: `${summary.orderCount || 0} 单` },
+      { label: '需补备餐', value: `${predictions.length} 项` },
+    ]
+  } catch {
+    sparkCards.value = [
+      { label: '客流峰值', value: '--' },
+      { label: '最近订单', value: '0 单' },
+      { label: '需补备餐', value: '0 项' },
+    ]
   }
 }
 
@@ -136,6 +141,6 @@ function scrollToMenu() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadCategories(), loadDishes()])
+  await Promise.all([loadCategories(), loadDishes(), loadSummary()])
 })
 </script>

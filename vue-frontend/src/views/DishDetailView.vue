@@ -43,12 +43,6 @@ const { add } = useCart()
 const loading = ref(false)
 const dish = ref({})
 const quantity = ref(1)
-const demoDishes = {
-  1: { id: 1, categoryName: '主食套餐', name: '红烧牛肉饭', price: 18, description: 'Spark 预测今日销量 86 份，建议备餐 104 份，午餐高峰前优先补货。', image: '/demo/beef-rice.png' },
-  2: { id: 2, categoryName: '主食套餐', name: '香煎鸡腿套餐', price: 20, description: '近 7 日午餐时段持续热销，适合窗口提前备餐。', image: '/demo/chicken-set.png' },
-  3: { id: 3, categoryName: '汤粉面', name: '番茄鸡蛋面', price: 12, description: '移动平均销量稳定，晚餐时段需求较平缓。', image: '/demo/tomato-noodle.png' },
-  4: { id: 4, categoryName: '热炒小碗', name: '麻婆豆腐', price: 10, description: '晚餐订单占比更高，Spark 分析建议 17:30 前完成补货。', image: '/demo/mapo-tofu.png' },
-}
 
 function addDish() {
   add(dish.value, quantity.value)
@@ -61,7 +55,8 @@ onMounted(async () => {
   try {
     dish.value = await api.dish(route.params.id)
   } catch {
-    dish.value = demoDishes[route.params.id] || demoDishes[1]
+    ElMessage.error('菜品加载失败')
+    router.push('/home')
   } finally {
     loading.value = false
   }

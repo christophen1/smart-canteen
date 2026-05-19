@@ -49,6 +49,7 @@ application-local.yml
 
 ### Generated ###
 scripts/data.sql
+*.log
 
 ### Frontend ###
 node_modules/

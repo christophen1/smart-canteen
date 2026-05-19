@@ -39,20 +39,13 @@ import { money, pageRecords, statusText, statusType } from '../utils/format'
 
 const loading = ref(false)
 const orders = ref([])
-const demoOrders = [
-  { id: 101, orderNo: 'SC202605180001', totalAmount: 48, status: 2, createTime: '2026-05-18 11:42:08' },
-  { id: 102, orderNo: 'SC202605180002', totalAmount: 30, status: 1, createTime: '2026-05-18 12:05:31' },
-  { id: 103, orderNo: 'SC202605170018', totalAmount: 26, status: 3, createTime: '2026-05-17 18:17:44' },
-]
-
 async function load() {
   loading.value = true
   try {
     const page = await api.myOrders({ page: 1, size: 100 })
-    const records = pageRecords(page)
-    orders.value = records.length ? records : demoOrders
+    orders.value = pageRecords(page)
   } catch {
-    orders.value = demoOrders
+    orders.value = []
   } finally {
     loading.value = false
   }

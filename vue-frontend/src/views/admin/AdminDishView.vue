@@ -42,28 +42,16 @@ const visible = ref(false)
 const keyword = ref('')
 const dishes = ref([])
 const categories = ref([])
-const demoCategories = [
-  { id: 1, name: '主食套餐' },
-  { id: 2, name: '热炒小碗' },
-  { id: 3, name: '汤粉面' },
-]
-const demoDishes = [
-  { id: 1, categoryId: 1, categoryName: '主食套餐', name: '红烧牛肉饭', price: 18, status: 1, description: 'Spark 预测热销菜品' },
-  { id: 2, categoryId: 1, categoryName: '主食套餐', name: '香煎鸡腿套餐', price: 20, status: 1, description: '午餐高峰备餐重点' },
-  { id: 3, categoryId: 3, categoryName: '汤粉面', name: '番茄鸡蛋面', price: 12, status: 1, description: '销量稳定菜品' },
-  { id: 4, categoryId: 2, categoryName: '热炒小碗', name: '麻婆豆腐', price: 10, status: 0, description: '晚餐补货参考' },
-]
 const form = reactive({ id: null, name: '', categoryId: null, price: 0, image: '', description: '', status: 1 })
 const isOn = computed({ get: () => form.status === 1, set: (value) => (form.status = value ? 1 : 0) })
 
 async function load() {
   loading.value = true
   try {
-    const page = await api.dishes({ page: 1, size: 100, keyword: keyword.value || undefined })
-    const records = pageRecords(page)
-    dishes.value = records.length ? records : demoDishes
+    const page = await api.adminDishes({ page: 1, size: 100, keyword: keyword.value || undefined })
+    dishes.value = pageRecords(page)
   } catch {
-    dishes.value = demoDishes.filter((dish) => !keyword.value || dish.name.includes(keyword.value))
+    dishes.value = []
   } finally {
     loading.value = false
   }
@@ -96,7 +84,7 @@ onMounted(async () => {
   try {
     categories.value = await api.categories()
   } catch {
-    categories.value = demoCategories
+    categories.value = []
   }
   await load()
 })

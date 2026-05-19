@@ -27,21 +27,13 @@ import { pageRecords } from '../../utils/format'
 const loading = ref(false)
 const keyword = ref('')
 const users = ref([])
-const demoUsers = [
-  { id: 1, username: 'admin', realName: '食堂管理员', phone: '13800000001', role: 1, status: 1, createTime: '2026-05-10 09:00:00' },
-  { id: 12, username: 'stu2026012', realName: '张同学', phone: '13800000012', role: 0, status: 1, createTime: '2026-05-12 10:21:11' },
-  { id: 19, username: 'stu2026019', realName: '李同学', phone: '13800000019', role: 0, status: 1, createTime: '2026-05-13 14:32:46' },
-  { id: 27, username: 'stu2026027', realName: '王同学', phone: '13800000027', role: 0, status: 0, createTime: '2026-05-14 08:18:20' },
-]
-
 async function load() {
   loading.value = true
   try {
     const page = await api.adminUsers({ page: 1, size: 100, keyword: keyword.value || undefined })
-    const records = pageRecords(page)
-    users.value = records.length ? records : demoUsers
+    users.value = pageRecords(page)
   } catch {
-    users.value = demoUsers.filter((user) => !keyword.value || user.username.includes(keyword.value) || user.realName.includes(keyword.value))
+    users.value = []
   } finally {
     loading.value = false
   }

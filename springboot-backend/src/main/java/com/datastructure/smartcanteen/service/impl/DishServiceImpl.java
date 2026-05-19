@@ -35,6 +35,19 @@ public class DishServiceImpl implements DishService {
     }
 
     @Override
+    public Page<DishVO> pageForAdmin(int page, int size, String keyword) {
+        LambdaQueryWrapper<Dish> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.like(Dish::getName, keyword);
+        }
+        wrapper.orderByDesc(Dish::getCreateTime);
+        Page<Dish> result = dishMapper.selectPage(new Page<>(page, size), wrapper);
+        Page<DishVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
+        voPage.setRecords(result.getRecords().stream().map(this::toVO).toList());
+        return voPage;
+    }
+
+    @Override
     public DishVO getById(Long id) {
         Dish dish = dishMapper.selectById(id);
         if (dish == null) {

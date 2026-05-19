@@ -18,6 +18,10 @@ http.interceptors.response.use(
     const payload = response.data
     if (payload && typeof payload.code !== 'undefined') {
       if (payload.code === 200) return payload.data
+      if (payload.code === 401) {
+        localStorage.removeItem('smart_token')
+        router.push('/login')
+      }
       if (response.config?.silent) return Promise.reject(payload)
       ElMessage.error(payload.message || '请求失败')
       return Promise.reject(payload)
@@ -59,7 +63,9 @@ export const api = {
   updateDish: (data) => http.put('/admin/dish', data),
   deleteDish: (id) => http.delete(`/admin/dish/${id}`),
   dishStatus: (data) => http.put('/admin/dish/status', data),
+  adminDishes: (params) => http.get('/admin/dish/page', { params, silent: true }),
   adminOrders: (params) => http.get('/admin/order/page', { params, silent: true }),
   adminOrderStatus: (id, data) => http.put(`/admin/order/${id}/status`, data, { silent: true }),
   analysis: (type) => http.get(`/analysis/${type}`, { silent: true }),
+  analysisSummary: () => http.get('/analysis/summary', { silent: true }),
 }

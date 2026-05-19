@@ -56,12 +56,6 @@ const configs = {
       { prop: 'dailyAmount', label: '销售额' },
       { prop: 'avgOrderAmount', label: '客单价' },
     ],
-    sample: [
-      { analysisDate: '2026-05-12', dailyOrders: 188, dailyAmount: 3520, avgOrderAmount: 18.72 },
-      { analysisDate: '2026-05-13', dailyOrders: 214, dailyAmount: 4216, avgOrderAmount: 19.7 },
-      { analysisDate: '2026-05-14', dailyOrders: 236, dailyAmount: 4688, avgOrderAmount: 19.86 },
-      { analysisDate: '2026-05-15', dailyOrders: 221, dailyAmount: 4320, avgOrderAmount: 19.55 },
-    ],
   },
   'peak-hour': {
     title: '高峰时段识别',
@@ -74,7 +68,6 @@ const configs = {
       { prop: 'orderCount', label: '订单量' },
       { prop: 'totalAmount', label: '销售额' },
     ],
-    sample: [9, 10, 11, 12, 13, 17, 18].map((hour, index) => ({ hour: `${hour}:00`, orderCount: [18, 32, 74, 108, 86, 62, 79][index], totalAmount: [320, 560, 1380, 2210, 1760, 1120, 1490][index] })),
   },
   'dish-sales': {
     title: '热门菜品 TOP10',
@@ -86,12 +79,6 @@ const configs = {
       { prop: 'dishName', label: '菜品' },
       { prop: 'salesCount', label: '销量' },
       { prop: 'salesAmount', label: '销售额' },
-    ],
-    sample: [
-      { dishName: '红烧牛肉饭', salesCount: 168, salesAmount: 3024 },
-      { dishName: '香煎鸡腿套餐', salesCount: 142, salesAmount: 2556 },
-      { dishName: '番茄鸡蛋面', salesCount: 128, salesAmount: 1536 },
-      { dishName: '麻婆豆腐', salesCount: 96, salesAmount: 2112 },
     ],
   },
   prediction: {
@@ -105,11 +92,6 @@ const configs = {
       { prop: 'predictedSales', label: '预测销量' },
       { prop: 'suggestedPrepare', label: '建议备餐' },
       { prop: 'confidence', label: '置信度' },
-    ],
-    sample: [
-      { dishName: '红烧牛肉饭', predictedSales: 86, suggestedPrepare: 104, confidence: 0.91 },
-      { dishName: '番茄鸡蛋面', predictedSales: 72, suggestedPrepare: 87, confidence: 0.88 },
-      { dishName: '香煎鸡腿套餐', predictedSales: 68, suggestedPrepare: 82, confidence: 0.86 },
     ],
   },
 }
@@ -143,9 +125,8 @@ function renderChart() {
 async function load() {
   try {
     rows.value = normalize(await api.analysis(props.type))
-    if (!rows.value.length) rows.value = config.value.sample
   } catch {
-    rows.value = config.value.sample
+    rows.value = []
   }
   await nextTick()
   renderChart()

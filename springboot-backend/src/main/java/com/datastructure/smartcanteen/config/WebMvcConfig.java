@@ -24,7 +24,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/user/register",
                         "/api/category/list",
                         "/api/dish/page",
-                        "/api/dish/*"
+                        "/api/dish/*",
+                        "/api/analysis/**"
                 );
 
         // 管理员鉴权拦截器 — 仅拦截 /api/admin/**
