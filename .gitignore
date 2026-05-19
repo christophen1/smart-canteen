@@ -50,3 +50,8 @@ application-local.yml
 ### Generated ###
 scripts/data.sql
 smart-canteen-temp/
+
+### Frontend ###
+node_modules/
+**/node_modules/
+vue-frontend/dist/
