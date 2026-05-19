@@ -49,6 +49,7 @@ application-local.yml
 
 ### Generated ###
 scripts/data.sql
+smart-canteen-temp/
 *.log
 
 ### Frontend ###

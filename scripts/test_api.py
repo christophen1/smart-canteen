@@ -117,8 +117,6 @@ def test_user_flow():
 def test_admin_flow():
     heading("2. 管理员注册与登录")
 
-    # 需要数据库中手动插入管理员，或者在这注册后手动改 role
-    # 简化方案：注册 adminuser，脚本提示手动改数据库
     log("注册管理员 adminuser")
     resp = api("POST", "/api/user/register", json={
         "username": "adminuser", "password": "admin123"
@@ -129,10 +127,15 @@ def test_admin_flow():
     else:
         log(f"adminuser 可能已存在: {body.get('message')}")
 
-    print("\n  >>> 请手动执行以下 SQL 将 adminuser 设为管理员:")
-    print("  UPDATE user SET role = 1 WHERE username = 'adminuser';")
-    print("  然后按 Enter 继续...")
-    input()
+    log("自动将 adminuser 设为管理员")
+    import subprocess
+    mysql_exe = "C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe"
+    cmd = f'"{mysql_exe}" -u root --password="!yzj20050626" smart_canteen -e "UPDATE user SET role = 1 WHERE username = \'adminuser\';"'
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if result.returncode == 0:
+        ok("adminuser 已设为管理员")
+    else:
+        bad(f"设置管理员失败: {result.stderr}")
 
     resp = api("POST", "/api/user/login", json={
         "username": "adminuser", "password": "admin123"
@@ -153,15 +156,14 @@ def test_category_crud(admin_token):
     resp = api("POST", "/api/admin/category", token=admin_token, json={
         "name": "主食类", "sort": 1
     })
-    data = assert_ok(resp, "创建分类")
-    if data is None:
-        return None, None
+    assert_ok(resp, "创建分类")
     cat_id = None
-    # 从 list 中取
+    # 从 list 中取（POST 不返回 data，需从列表获取）
     resp = api("GET", "/api/category/list")
     data = assert_ok(resp, "获取分类列表")
     if data and len(data) > 0:
-        cat_id = data[0]["id"]
+        # 取最后一个（最新创建的）
+        cat_id = data[-1]["id"]
         ok(f"分类 ID = {cat_id}")
 
     log("创建分类「炒菜类」")
@@ -403,6 +405,38 @@ def test_delete_cleanup(admin_token, dish_ids):
             assert_ok(resp, f"删除分类 {cat['name']}")
 
 
+def test_analysis_apis(user_token, admin_token):
+    heading("10. 数据分析接口 (需要数据库有分析数据)")
+
+    tokens = {"user": user_token, "admin": admin_token}
+    endpoints = [
+        ("customer-flow", "客流分析"),
+        ("peak-hour", "高峰时段分析"),
+        ("dish-sales", "菜品销量"),
+        ("prediction", "备餐预测"),
+    ]
+
+    for ep, label in endpoints:
+        log(f"查询 {label} (普通用户)")
+        resp = api("GET", f"/api/analysis/{ep}?page=1&size=5", token=user_token)
+        data = assert_ok(resp, f"用户查看{label}")
+        if data:
+            ok(f"  {label}: 共 {data.get('total', 0)} 条记录")
+
+        log(f"查询 {label} (管理员)")
+        resp = api("GET", f"/api/analysis/{ep}?page=1&size=5", token=admin_token)
+        data = assert_ok(resp, f"管理员查看{label}")
+        if data:
+            ok(f"  {label}: 共 {data.get('total', 0)} 条记录")
+
+    log("未登录访问分析接口应被拦截")
+    resp = api("GET", "/api/analysis/customer-flow")
+    if resp.status_code == 401 or (resp.status_code == 200 and resp.json().get("code") == 401):
+        ok("未登录被拒绝")
+    else:
+        bad("未登录应返回401", resp)
+
+
 def main():
     global PASS, FAIL
 
@@ -428,6 +462,7 @@ def main():
     test_admin_order(admin_token, order_id)
     test_admin_user(admin_token)
     test_user_info(user_token)
+    test_analysis_apis(user_token, admin_token)
     test_delete_cleanup(admin_token, dish_ids)
 
     # ---- 结果 ----

@@ -153,6 +153,7 @@ def generate():
         f.write("-- ============================================\n")
 
         order_id = 1
+        order_item_count = 0
 
         for day_offset in range(DAYS):
             date = START_DATE + timedelta(days=day_offset)
@@ -198,18 +199,21 @@ def generate():
                     write(f, "INSERT INTO order_item (order_id, dish_id, dish_name, dish_price, quantity, create_time) VALUES")
                     write(f, "(%d, %d, '%s', %.2f, %d, '%s');",
                           order_id, did, dname, dprice, qty, order_time)
+                    order_item_count += 1
 
                 orders_ids.append(order_id)
                 order_id += 1
 
         f.write("\n")
-        f.write(f"-- 总计: {order_id - 1} 个订单, {order_id - 1} 条 order_item\n")
+        f.write(f"-- 总计: {order_id - 1} 个订单, {order_item_count} 条 order_item\n")
 
+    total_orders = order_id - 1
     print(f"生成完成: {OUTPUT}")
     print(f"  用户: 205 (200普通 + 5管理员, 密码均为 123456)")
     print(f"  分类: {len(CATEGORIES)}")
     print(f"  菜品: {len(DISHES)}")
-    print(f"  订单: {order_id - 1}")
+    print(f"  订单: {total_orders}")
+    print(f"  订单明细: {order_item_count}")
     print(f"\n导入: mysql -u root -p < {OUTPUT}")
 
 

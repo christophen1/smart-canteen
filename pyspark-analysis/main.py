@@ -6,13 +6,14 @@ import dish_sales
 import meal_prediction
 import os
 
+
 def main():
-    # Set fake HADOOP_HOME to avoid Windows issues
+    # 设置假的 HADOOP_HOME 以避免 Windows 环境问题
     os.environ['HADOOP_HOME'] = 'C:\\fake'
     
-    # Initialize SparkSession
+    # 初始化 SparkSession
     spark = SparkSession.builder \
-        .appName("Smart Canteen Analysis") \
+        .appName("校园食堂数据分析") \
         .master("local[*]") \
         .config("spark.jars", config.MYSQL_JAR_PATH) \
         .config("spark.sql.warehouse.dir", "file:///tmp/spark-warehouse") \
@@ -23,24 +24,25 @@ def main():
         .getOrCreate()
 
     try:
-        # Run customer flow analysis
+        # 执行客流分析
         customer_flow.analyze_customer_flow(spark)
 
-        # Run peak hour analysis
+        # 执行高峰时段分析
         peak_hour.analyze_peak_hour(spark)
 
-        # Run dish sales analysis
+        # 执行菜品销量分析
         dish_sales.analyze_dish_sales(spark)
 
-        # Run meal prediction
+        # 执行备餐预测
         meal_prediction.predict_meals(spark)
 
-        print("All analyses completed successfully.")
+        print("所有分析任务执行完成。")
 
     except Exception as e:
-        print(f"Error during analysis: {e}")
+        print(f"分析过程中发生错误: {e}")
     finally:
         spark.stop()
+
 
 if __name__ == "__main__":
     main()

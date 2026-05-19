@@ -11,9 +11,9 @@
 | 层 | 技术 |
 |-----|------|
 | 后端 | Java 17, SpringBoot 3.2, MyBatis Plus 3.5, MySQL 8, JWT |
-| 前端 | Vue 3, Element Plus, Axios, Echarts |
+| 前端 | Vue 3, Vite, Element Plus, Vue Router, Axios, Echarts |
 | 大数据 | Python 3.10+, PySpark, SparkSQL |
-| 构建 | Maven |
+| 构建 | Maven (后端), npm (前端) |
 
 ## 项目结构
 
@@ -38,6 +38,7 @@ smart-canteen/
 - JDK 17
 - Maven 3.8+
 - MySQL 8.0
+- Node.js 18+（前端开发用）
 - Python 3.10+（PySpark 分析用）
 
 ### 2. 数据库
@@ -87,7 +88,35 @@ cd springboot-backend
 mvn spring-boot:run
 ```
 
-### 6. 运行 API 测试
+### 6. 运行 PySpark 分析
+
+```bash
+# 安装 Python 依赖
+pip install -r pyspark-analysis/requirements.txt
+
+# 执行分析（确保 MySQL 中有订单数据）
+python pyspark-analysis/main.py
+```
+
+PySpark 会读取 MySQL 中的订单数据，依次执行客流分析、高峰时段分析、菜品销量分析和备餐预测，结果写回 MySQL 分析结果表，前端数据看板可直接查询展示。
+
+> **Windows 注意**：PySpark 需要 Java 8/11 环境，配置细节见 `docs/report/chapter3-implementation.md` 3.1.3 节。
+
+### 7. 启动前端
+
+```bash
+cd vue-frontend
+npm install
+npm run dev
+```
+
+前端默认运行在 `http://localhost:5173`，通过 Vite proxy 将 `/api` 请求转发到后端 `localhost:8080`。
+
+启动后访问：
+- 用户端：`http://localhost:5173/home`
+- 管理端：`http://localhost:5173/admin/login`
+
+### 8. 运行 API 测试
 
 ```bash
 pip install requests
