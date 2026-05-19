@@ -107,7 +107,7 @@ def generate():
         f.write("-- ============================================\n")
 
         # BCrypt hash for "123456"
-        pwd = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+        pwd = "$2a$10$OVs3MUF6Wpmk2ngMplXI3OLEwteStzaAngqWbn5J5SaoI9crviLdK"
 
         for i in range(1, 206):
             username = f"user{i:03d}" if i <= 200 else ADMIN_USERNAMES[i - 201]
