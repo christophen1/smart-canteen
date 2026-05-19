@@ -1,4 +1,4 @@
-# 第4章 技术总结
+java# 第4章 技术总结
 
 ## 4.1 大数据技术总结
 ### 4.1.1 Spark Core
@@ -90,14 +90,16 @@ prediction_df.write.jdbc(
 
 ### 4.2.2 Vue 3 前端技术
 
-- **Composition API**：使用 `setup()` 和响应式 API（`ref`、`reactive`）组织组件逻辑
-- **Element Plus**：使用 `el-table`、`el-form`、`el-dialog` 等组件快速搭建管理后台
-- **Axios**：封装请求拦截器和响应拦截器，自动携带 JWT token，统一处理 401 跳转登录
-- **Vue Router**：前端路由守卫，未登录用户自动跳转登录页
-- **Echarts**：折线图（客流趋势）、柱状图（高峰时段/菜品销量）、饼图（分类占比）的组合展示
+- **Composition API**：使用 `<script setup>` 语法糖和响应式 API（`ref`、`reactive`、`computed`）组织组件逻辑
+- **Element Plus**：使用 `el-table`、`el-form`、`el-dialog`、`el-switch`、`el-badge` 等组件快速搭建管理后台和用户端界面
+- **Axios**：封装请求拦截器和响应拦截器，自动携带 JWT token，统一解包后端 `{ code, message, data }` 响应格式，401 自动跳转登录
+- **Vue Router**：history 模式路由，全局前置守卫 `beforeEach` 校验 token，未登录自动重定向登录页
+- **Vue 响应式状态**：基于 `reactive` + `computed` + `localStorage` 实现购物车状态管理（添加菜品、修改数量、清空购物车），无需额外状态管理库
+- **Echarts**：折线图（客流趋势）、柱状图（高峰时段/菜品销量）、表格+图表组合展示（备餐预测）
+- **Vite**：开发服务器端口 5173，proxy 配置将 `/api` 转发到后端 `localhost:8080`，无需跨域配置
 
 ### 4.2.3 项目整合
 
-- SpringBoot + Vue 通过 CORS 配置实现跨域通信
-- PySpark 通过 MySQL 与 SpringBoot 解耦：SpringBoot 不依赖 PySpark 运行，仅读取分析结果表
+- SpringBoot + Vue 前后端分离：开发阶段通过 Vite proxy 转发 `/api` 请求到后端，生产环境可通过 Nginx 反向代理或后端 CORS 配置实现跨域通信
+- PySpark 通过 MySQL 与 SpringBoot 解耦：SpringBoot 不直接调用 PySpark，仅读取 PySpark 写入的分析结果表，两者异步协作
 - 系统可独立部署：MySQL 独立运行，SpringBoot 可打包为 jar，Vue 可打包为静态文件由 Nginx 托管，PySpark 由定时任务触发

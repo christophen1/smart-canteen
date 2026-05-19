@@ -413,8 +413,21 @@ pyspark-analysis/
 
 ### 7.4 执行方式
 
+**手动执行**：
+
+```bash
+# 安装依赖
+pip install -r pyspark-analysis/requirements.txt
+
+# 执行全部分析任务
+python pyspark-analysis/main.py
+```
+
+**定时执行**：
+
 - 使用 Windows 定时任务或 Linux crontab 定时执行 `main.py`
 - 建议每天凌晨执行一次（如 02:00），分析前一天的订单数据
+- crontab 示例：`0 2 * * * cd /path/to/smart-canteen && python pyspark-analysis/main.py`
 
 ---
 

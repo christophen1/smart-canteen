@@ -14,7 +14,7 @@
 
 | 软件 | 版本 | 用途 |
 |------|------|------|
-| JDK | 17 | Java 运行环境 |
+| JDK | 17 | Java 运行环境（SpringBoot + PySpark 共用，MySQL JDBC 驱动 9.x 要求 17+） |
 | Maven | 3.8+ | 后端构建管理 |
 | SpringBoot | 3.x | 后端框架 |
 | MyBatis Plus | 3.5+ | ORM 框架 |
@@ -24,17 +24,16 @@
 | Vue | 3.x | 前端框架 |
 | Element Plus | 2.x | UI 组件库 |
 | Echarts | 5.x | 数据可视化图表 |
-| Python | 3.10+ | PySpark 运行环境 |
-| PySpark | 3.x | 大数据分析引擎 |
-| Java (Spark) | JDK 8/11 | Spark 运行时（需与 PySpark 匹配） |
+| Python | 3.8+（推荐 3.10-3.11） | PySpark 运行环境（3.12+ 有兼容风险） |
+| PySpark | 3.4+ | 大数据分析引擎 |
 
 ### 3.1.3 Spark 安装与配置
 
-1. 安装 Python 3.10+
-2. `pip install pyspark` 安装 PySpark
-3. 下载 MySQL JDBC 驱动 `mysql-connector-j-8.x.x.jar`
-4. 将 JDBC jar 放入 Spark 的 jars 目录或使用 `--jars` 参数指定
-5. 验证：`pyspark --version`
+1. 安装 JDK 17（MySQL Connector/J 9.x 要求 Java 17+）
+2. 安装 Python 3.8+（推荐 3.10/3.11）
+3. `pip install -r pyspark-analysis/requirements.txt` 安装依赖
+4. MySQL JDBC 驱动已内置在 `pyspark-analysis/lib/mysql-connector-j-9.7.0.jar`，无需额外下载
+5. 验证：`python -c "import pyspark; print(pyspark.__version__)"`
 
 ### 3.1.4 开发工具
 
@@ -131,21 +130,117 @@ public class JwtInterceptor implements HandlerInterceptor {
 
 ### 3.2.3 PySpark 分析模块实现
 
-- 客流分析脚本实现
-- 高峰时段分析脚本实现
-- 菜品销量分析脚本实现
-- 备餐预测脚本实现
+PySpark 分析模块位于 `pyspark-analysis/`，包含 5 个脚本，通过 `main.py` 统一调度执行。
+
+**模块结构**：
+
+```
+pyspark-analysis/
+├── config.py              // 数据库连接配置（从环境变量读取）
+├── customer_flow.py       // 客流分析
+├── peak_hour.py           // 高峰时段分析
+├── dish_sales.py          // 菜品销量分析
+├── meal_prediction.py     // 备餐预测
+├── main.py                // 总入口（调度各分析任务）
+└── requirements.txt       // Python 依赖
+```
+
+**执行流程**：
+1. `SparkSession.builder` 初始化，master 设为 `local[*]` 本地模式
+2. 通过 `spark.read.jdbc()` 从 MySQL 读取 orders 和 order_item 表为 DataFrame
+3. 依次调用 4 个分析函数，每个函数接收 SparkSession，执行 SparkSQL 或 DataFrame 转换
+4. 分析结果通过 `df.write.jdbc()` 写回 MySQL 对应的分析结果表
+5. 所有任务完成后关闭 SparkSession
+
+**各分析任务实现要点**：
+
+- **客流分析**：`DATE(create_time)` 提取日期 → `groupBy("analysis_date").agg(count(), sum(), countDistinct())` → 写入 customer_flow_analysis 表
+- **高峰时段分析**：`withColumn("hour", hour(col("create_time")))` → 按 (日期, 小时) 双重分组 → 写入 peak_hour_analysis 表
+- **菜品销量分析**：orders JOIN order_item → 按 (日期, dish_id) 分组 → `orderBy desc limit 10` 取 TOP10 → 写入 dish_sales_analysis 表
+- **备餐预测**：读取历史销量数据 → `Window.rowsBetween(-6, 0)` 定义 7 天滑动窗口 → `avg().over(window)` 计算移动平均 → 建议备餐量 = 预测值 × 1.2 → 写入 meal_prediction 表
+
+**依赖**：PySpark 3.x、MySQL JDBC 驱动 (`mysql-connector-j`)，JDBC jar 需放入 Spark 的 jars 目录或通过 `--jars` 参数指定。
 
 ### 3.2.4 前端实现
 
-- 用户端页面
-- 管理端页面
-- 数据可视化页面
+前端基于 **Vue 3 + Vite 6** 构建，入口 `vue-frontend/`，共 19 个源文件，分为用户端和管理端两大部分。
+
+**项目初始化与配置**：
+
+- Vite 6 作为构建工具，开发服务器端口 5173
+- `vite.config.js` 配置 proxy：`/api` 前缀请求转发到 `http://localhost:8080`，开发阶段无需 CORS
+- 依赖：Vue 3.5、Vue Router 4.5、Element Plus 2.9、Echarts 5.6、Axios 1.7
+
+**Axios 封装（`api/http.js`）**：
+
+- `baseURL: '/api'`，统一请求前缀
+- 请求拦截器：自动从 `localStorage.smart_token` 读取 token，添加 `Authorization: Bearer <token>` 头
+- 响应拦截器：统一解包 `{ code, message, data }` 格式，code=200 返回 data，非 200 自动 `ElMessage.error` 提示
+- 401 状态码：自动清除 token 并 `router.push('/login')` 跳转登录页
+- 所有 API 方法集中在 `api` 对象中导出，共 24 个方法覆盖全部后端接口
+
+**路由设计（`router/index.js`）**：
+
+- history 模式（无 `#` 号），15 条路由
+- 路由元信息 `meta.auth` 控制认证，`meta.admin` 控制管理员权限
+- 全局前置守卫 `beforeEach`：检查 `localStorage.smart_token`，未认证访问受保护路由时跳转登录页
+
+**用户端页面（5 个）**：
+
+| 页面 | 组件 | 核心功能 |
+|------|------|----------|
+| 登录/注册 | LoginView.vue | tab 切换登录/注册表单，表单校验 |
+| 首页 | HomeView.vue | 分类 tabs 切换、关键词搜索、菜品卡片网格、加入购物车 |
+| 菜品详情 | DishDetailView.vue | 大图展示、描述、价格、数量选择、加购 |
+| 购物车 | CartView.vue | reactive 状态管理 + localStorage 持久化、数量调整、总价计算、提交订单 |
+| 我的订单 | OrdersView.vue | 分页列表、状态标签、订单明细展开、取消操作 |
+
+**管理端页面（10 个文件）**：
+
+| 页面 | 组件 | 核心功能 |
+|------|------|----------|
+| 管理员登录 | AdminLoginView.vue | 独立登录页 |
+| 管理布局 | AdminLayout.vue | 侧边导航 + 顶栏 + `<router-view>` 插槽 |
+| 工作台 | AdminDashboardView.vue | 用户数/订单数/菜品数/今日销售额 统计卡片 + 快捷入口 |
+| 分类管理 | AdminCategoryView.vue | el-table + el-dialog 弹窗 CRUD，排序字段 |
+| 菜品管理 | AdminDishView.vue | 表格 + 新增/编辑弹窗 + 上下架 toggle |
+| 订单管理 | AdminOrderView.vue | 订单列表 + 状态下拉变更（待支付/已支付/已完成/已取消） |
+| 用户管理 | AdminUserView.vue | 用户列表 + 启用/禁用 switch |
+| 数据分析 | AdminAnalysisView.vue | **复用组件**，通过 `props.type` 切换 4 种分析类型，Echarts 渲染 + 数据表格 |
+
+**数据可视化（AdminAnalysisView.vue）**：
+
+- 统一组件，根据路由 `props.type` 参数渲染不同分析内容
+- 4 种分析类型：`customer-flow`（客流折线图）、`peak-hour`（高峰柱状图）、`dish-sales`（销量 TOP10 柱状图）、`prediction`（备餐预测表格+图）
+- 每种类型配置独立的：标题、说明文案、对应 PySpark 脚本名、结果表名、图表类型、表格列定义
+- 调用 `/api/analysis/{type}` 获取数据，Echarts 绑定 `chartRef` 渲染
+
+**全局样式（`assets/main.css`）**：
+
+- CSS 自定义属性（颜色、圆角、阴影）
+- 顶部导航栏（`.topbar`）、卡片网格、Hero 区域等通用布局样式
 
 ### 3.2.5 前后端联调
 
-- API 对接测试
-- 数据流验证
+**开发环境联调方案**：
+
+- 后端 SpringBoot 运行在 `http://localhost:8080`
+- 前端 Vite dev server 运行在 `http://localhost:5173`
+- Vite proxy 将 `/api` 前缀请求转发至后端，**无需配置 CORS 即可联调**
+
+**认证流程**：
+
+1. 用户在前端登录 → Axios POST `/api/user/login` → 后端验证并返回 JWT token
+2. 前端将 token 存入 `localStorage.smart_token`，用户信息存入 `localStorage.smart_user`
+3. 后续所有请求由 Axios 拦截器自动附加 `Authorization: Bearer <token>` 头
+4. 后端 `JwtInterceptor` 解析 token，将 userId 注入 request attribute
+5. 管理员接口额外经过 `AdminInterceptor` 校验 `role == 1`
+6. token 过期或无效时后端返回 401 → Axios 响应拦截器自动清除本地 token 并跳转登录页
+
+**数据流验证**：
+
+- 用户下单 → SpringBoot 写入 orders/order_item 表 → PySpark 定时分析 → 结果写入分析结果表 → 前端 `/api/analysis/{type}` 查询 → Echarts 渲染
+- 全链路验证方式：启动后端 → 启动前端 → 浏览器访问各页面 → 通过 Postman 或 `scripts/test_api.py` 辅助验证接口
 
 ---
 
