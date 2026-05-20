@@ -24,12 +24,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/user/register",
                         "/api/category/list",
                         "/api/dish/page",
-                        "/api/dish/*",
-                        "/api/analysis/**"
+                        "/api/dish/*"
                 );
 
         // 管理员鉴权拦截器 — 仅拦截 /api/admin/**
         registry.addInterceptor(adminInterceptor)
-                .addPathPatterns("/api/admin/**");
+                .addPathPatterns(
+                        "/api/admin/**",
+                        "/api/analysis/**");
     }
 }

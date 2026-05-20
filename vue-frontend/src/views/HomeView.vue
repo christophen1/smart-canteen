@@ -8,6 +8,11 @@
           <el-button :icon="ShoppingCart" @click="$router.push('/cart')">购物车</el-button>
         </el-badge>
         <el-button :icon="Tickets" @click="$router.push('/orders')">我的订单</el-button>
+        <template v-if="user">
+          <el-tag type="info" size="large">{{ user.username }}</el-tag>
+          <el-button :icon="SwitchButton" @click="logout">退出</el-button>
+        </template>
+        <el-button v-else type="primary" :icon="User" @click="$router.push('/login')">登录</el-button>
         <el-button type="primary" plain :icon="DataAnalysis" @click="$router.push('/admin/dashboard')">经营看板</el-button>
       </el-space>
     </header>
@@ -69,11 +74,22 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { DataAnalysis, Plus, Search, ShoppingBag, ShoppingCart, Tickets, TrendCharts, View } from '@element-plus/icons-vue'
+import { DataAnalysis, Plus, Search, ShoppingBag, ShoppingCart, SwitchButton, Tickets, TrendCharts, User, View } from '@element-plus/icons-vue'
 import { api } from '../api/http'
 import { useCart } from '../stores/cart'
 import { money, pageRecords } from '../utils/format'
+
+const router = useRouter()
+const user = ref(JSON.parse(localStorage.getItem('smart_user') || 'null'))
+
+function logout() {
+  localStorage.removeItem('smart_token')
+  localStorage.removeItem('smart_user')
+  user.value = null
+  router.push('/home')
+}
 
 const fallbackImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'
 const sparkCards = ref([

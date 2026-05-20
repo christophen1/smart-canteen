@@ -26,12 +26,13 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
 import { api } from '../api/http'
 
 const router = useRouter()
+const route = useRoute()
 const mode = ref('login')
 const loading = ref(false)
 const formRef = ref()
@@ -52,7 +53,8 @@ async function submit() {
     const res = await api.login(form)
     localStorage.setItem('smart_token', res.token)
     localStorage.setItem('smart_user', JSON.stringify(res.user))
-    router.push(res.user?.role === 1 ? '/admin/dashboard' : '/home')
+    const isAdminLogin = route.path.startsWith('/admin')
+    router.push(isAdminLogin && res.user?.role === 1 ? '/admin/dashboard' : '/home')
   } finally {
     loading.value = false
   }
