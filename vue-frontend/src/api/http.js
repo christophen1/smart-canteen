@@ -66,6 +66,6 @@ export const api = {
   adminDishes: (params) => http.get('/admin/dish/page', { params, silent: true }),
   adminOrders: (params) => http.get('/admin/order/page', { params, silent: true }),
   adminOrderStatus: (id, data) => http.put(`/admin/order/${id}/status`, data, { silent: true }),
-  analysis: (type) => http.get(`/analysis/${type}`, { silent: true }),
+  analysis: (type, params) => http.get(`/analysis/${type}`, { params, silent: true }),
   analysisSummary: () => http.get('/analysis/summary', { silent: true }),
 }

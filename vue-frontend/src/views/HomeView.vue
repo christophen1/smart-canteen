@@ -8,24 +8,24 @@
           <el-button :icon="ShoppingCart" @click="$router.push('/cart')">购物车</el-button>
         </el-badge>
         <el-button :icon="Tickets" @click="$router.push('/orders')">我的订单</el-button>
-        <el-button type="primary" plain :icon="DataAnalysis" @click="$router.push('/admin/analysis/prediction')">Spark 看板</el-button>
+        <el-button type="primary" plain :icon="DataAnalysis" @click="$router.push('/admin/dashboard')">经营看板</el-button>
       </el-space>
     </header>
 
     <section class="canteen-hero">
       <div>
-        <p class="eyebrow">Smart Canteen</p>
-        <h1>校园点餐与备餐预测一体化</h1>
+        <p class="eyebrow">智慧食堂</p>
+        <h1>在线点餐，错峰取餐更省心</h1>
         <p class="hero-copy">
-          学生在线点餐形成订单数据，PySpark 离线批处理每日汇总客流、高峰时段、热门菜品与次日备餐建议。
+          浏览今日菜品、加入购物车并提交订单，后厨会根据订单和用餐高峰提前安排备餐。
         </p>
         <el-space wrap>
           <el-button type="primary" size="large" :icon="ShoppingBag" @click="scrollToMenu">开始点餐</el-button>
-          <el-button size="large" :icon="TrendCharts" @click="$router.push('/admin/dashboard')">查看运营后台</el-button>
+          <el-button size="large" :icon="TrendCharts" @click="$router.push('/orders')">查看我的订单</el-button>
         </el-space>
       </div>
       <div class="hero-panel">
-        <div class="hero-panel-title">今日 Spark 预测</div>
+        <div class="hero-panel-title">今日用餐概况</div>
         <div v-for="item in sparkCards" :key="item.label" class="spark-mini-card">
           <span>{{ item.label }}</span>
           <strong>{{ item.value }}</strong>
@@ -39,7 +39,7 @@
           <h2 class="section-title">今日菜品</h2>
           <span class="muted">按分类浏览、搜索并加入购物车</span>
         </div>
-        <el-tag type="success" size="large">实时接口数据</el-tag>
+        <el-tag type="success" size="large">今日供应</el-tag>
       </div>
       <el-tabs v-model="activeCategory" @tab-change="loadDishes">
         <el-tab-pane label="全部" name="" />
@@ -78,8 +78,8 @@ import { money, pageRecords } from '../utils/format'
 const fallbackImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'
 const sparkCards = ref([
   { label: '客流峰值', value: '12:00' },
-  { label: '预测订单', value: '238 单' },
-  { label: '需补备餐', value: '3 项' },
+  { label: '最近订单', value: '238 单' },
+  { label: '备餐提醒', value: '3 项' },
 ])
 
 const loading = ref(false)
@@ -120,13 +120,36 @@ async function loadSummary() {
     sparkCards.value = [
       { label: '客流峰值', value: summary.peakHour || '--' },
       { label: '最近订单', value: `${summary.orderCount || 0} 单` },
-      { label: '需补备餐', value: `${predictions.length} 项` },
+      { label: '备餐提醒', value: `${predictions.length} 项` },
+    ]
+  } catch {
+    await loadSummaryFromAnalysis()
+  }
+}
+
+async function loadSummaryFromAnalysis() {
+  try {
+    const [predictionPage, peakPage, flowPage] = await Promise.all([
+      api.analysis('prediction', { page: 1, size: 100 }),
+      api.analysis('peak-hour', { page: 1, size: 24 }),
+      api.analysis('customer-flow', { page: 1, size: 1 }),
+    ])
+    const predictions = pageRecords(predictionPage)
+    const peakRows = pageRecords(peakPage)
+    const flowRows = pageRecords(flowPage)
+    const peak = peakRows.reduce((best, row) => (Number(row.orderCount || 0) > Number(best?.orderCount || 0) ? row : best), null)
+    const latestFlow = flowRows[0]
+    const peakHour = peak?.hour != null ? (String(peak.hour).includes(':') ? peak.hour : `${String(peak.hour).padStart(2, '0')}:00`) : '--'
+    sparkCards.value = [
+      { label: '客流峰值', value: peakHour },
+      { label: '最近订单', value: `${latestFlow?.dailyOrders || 0} 单` },
+      { label: '备餐提醒', value: `${predictions.length} 项` },
     ]
   } catch {
     sparkCards.value = [
       { label: '客流峰值', value: '--' },
       { label: '最近订单', value: '0 单' },
-      { label: '需补备餐', value: '0 项' },
+      { label: '备餐提醒', value: '0 项' },
     ]
   }
 }

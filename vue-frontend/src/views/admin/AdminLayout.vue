@@ -9,7 +9,7 @@
         <el-menu-item index="/admin/order"><el-icon><Tickets /></el-icon><span>订单管理</span></el-menu-item>
         <el-menu-item index="/admin/user"><el-icon><User /></el-icon><span>用户管理</span></el-menu-item>
         <el-sub-menu index="/admin/analysis">
-          <template #title><el-icon><TrendCharts /></el-icon><span>Spark 分析</span></template>
+          <template #title><el-icon><TrendCharts /></el-icon><span>经营分析</span></template>
           <el-menu-item index="/admin/analysis/flow">客流分析</el-menu-item>
           <el-menu-item index="/admin/analysis/peak">高峰时段</el-menu-item>
           <el-menu-item index="/admin/analysis/dish">菜品销量</el-menu-item>
@@ -21,7 +21,7 @@
       <el-header class="topbar admin-topbar" style="position: static">
         <div>
           <strong>{{ title }}</strong>
-          <div class="muted admin-subtitle">SpringBoot + MySQL + PySpark 离线分析</div>
+          <div class="muted admin-subtitle">订单、菜品、客流与备餐协同管理</div>
         </div>
         <el-space>
           <el-button :icon="House" @click="$router.push('/home')">用户端</el-button>

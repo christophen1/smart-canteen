@@ -2,13 +2,13 @@
   <div class="analysis-page">
     <section class="analysis-hero">
       <div>
-        <p class="eyebrow">Spark 分析任务</p>
+        <p class="eyebrow">经营分析</p>
         <h2>{{ config.title }}</h2>
         <p>{{ config.desc }}</p>
       </div>
       <div class="spark-code-card">
-        <strong>{{ config.script }}</strong>
-        <span>读取 MySQL -> DataFrame 转换 -> 写回分析结果表</span>
+        <strong>{{ config.metric }}</strong>
+        <span>{{ config.hint }}</span>
       </div>
     </section>
 
@@ -23,7 +23,7 @@
     </el-card>
     <el-card class="table-card" style="margin-top: 16px">
       <template #header>
-        <strong>分析结果表：{{ config.tableName }}</strong>
+        <strong>{{ config.tableTitle }}</strong>
       </template>
       <el-table :data="rows">
         <el-table-column v-for="column in config.columns" :key="column.prop" :prop="column.prop" :label="column.label" />
@@ -47,9 +47,10 @@ const configs = {
   'customer-flow': {
     title: '客流分析',
     chartTitle: '每日订单量与客单价',
-    script: 'customer_flow.py',
-    tableName: 'customer_flow_analysis',
-    desc: '按日期聚合订单量、销售额、客单价和消费用户数，用于观察食堂整体客流趋势。',
+    metric: '客流趋势',
+    hint: '观察每日订单量、销售额和客单价变化',
+    tableTitle: '每日客流明细',
+    desc: '按日期汇总订单量、销售额、客单价和消费用户数，用于观察食堂整体客流趋势。',
     columns: [
       { prop: 'analysisDate', label: '日期' },
       { prop: 'dailyOrders', label: '订单量' },
@@ -60,9 +61,10 @@ const configs = {
   'peak-hour': {
     title: '高峰时段识别',
     chartTitle: '分小时订单峰值',
-    script: 'peak_hour.py',
-    tableName: 'peak_hour_analysis',
-    desc: '从 create_time 中提取小时维度，定位午餐和晚餐的排队压力时段。',
+    metric: '高峰时段',
+    hint: '定位窗口备餐和排队压力最大的时间段',
+    tableTitle: '小时客流明细',
+    desc: '按小时统计订单量和销售额，定位午餐、晚餐的排队压力时段。',
     columns: [
       { prop: 'hour', label: '小时' },
       { prop: 'orderCount', label: '订单量' },
@@ -72,9 +74,10 @@ const configs = {
   'dish-sales': {
     title: '热门菜品 TOP10',
     chartTitle: '菜品销量排行',
-    script: 'dish_sales.py',
-    tableName: 'dish_sales_analysis',
-    desc: 'JOIN orders 与 order_item，按菜品分组统计销量和销售额，辅助窗口备餐。',
+    metric: '销量排行',
+    hint: '识别近期热销菜品和补货重点',
+    tableTitle: '菜品销量明细',
+    desc: '按菜品统计销量和销售额，帮助窗口安排热销菜品备餐。',
     columns: [
       { prop: 'dishName', label: '菜品' },
       { prop: 'salesCount', label: '销量' },
@@ -84,9 +87,10 @@ const configs = {
   prediction: {
     title: '备餐预测',
     chartTitle: '预测销量与建议备餐',
-    script: 'meal_prediction.py',
-    tableName: 'meal_prediction',
-    desc: '基于近 7 天销量移动平均预测次日销量，并乘以 1.2 安全系数生成建议备餐量。',
+    metric: '备餐建议',
+    hint: '根据近期销量给出下一餐备餐参考',
+    tableTitle: '备餐建议明细',
+    desc: '根据近期销量趋势估算需求，并给出建议备餐量，降低缺餐和浪费。',
     columns: [
       { prop: 'dishName', label: '菜品' },
       { prop: 'predictedSales', label: '预测销量' },
@@ -99,8 +103,16 @@ const configs = {
 const config = computed(() => configs[props.type])
 
 function normalize(data) {
-  if (Array.isArray(data)) return data
-  return data?.records || data?.list || data?.data || []
+  const records = Array.isArray(data) ? data : data?.records || data?.list || data?.data || []
+  if (props.type === 'peak-hour') {
+    return records.map((row) => ({
+      ...row,
+      hour: row.hour != null && !String(row.hour).includes(':') ? `${String(row.hour).padStart(2, '0')}:00` : row.hour,
+    }))
+  }
+  return props.type === 'customer-flow'
+    ? records.slice().sort((a, b) => String(a.analysisDate || '').localeCompare(String(b.analysisDate || '')))
+    : records
 }
 
 function renderChart() {
@@ -124,7 +136,7 @@ function renderChart() {
 
 async function load() {
   try {
-    rows.value = normalize(await api.analysis(props.type))
+    rows.value = normalize(await api.analysis(props.type, { page: 1, size: 100 }))
   } catch {
     rows.value = []
   }
