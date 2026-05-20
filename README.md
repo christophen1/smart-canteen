@@ -23,6 +23,7 @@ smart-canteen/
 ├── pyspark-analysis/       # PySpark 离线分析（Python）
 ├── vue-frontend/           # Vue 前端
 ├── scripts/                # 脚本
+│   ├── generate_data.py    # 测试数据生成
 │   └── test_api.py         # API 测试脚本
 ├── docs/                   # 文档
 │   ├── PRD.md              # 产品需求文档
@@ -52,8 +53,8 @@ mysql -u root -p < docs/sql/schema.sql
 
 ```bash
 python scripts/generate_data.py     # 生成 data.sql
-cmd /c "mysql -u root -p < scripts\data.sql"# 导入数据
-Get-Content -Encoding UTF8 scripts/data.sql | mysql -u root -p                                                                                                                                                                                                                                      
+# 用 cmd 重定向导入（避免 PowerShell 编码问题）
+cmd /c "mysql -u root -p < scripts\data.sql"
 ```
 
 ### 4. 配置环境变量

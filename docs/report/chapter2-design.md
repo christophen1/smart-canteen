@@ -187,43 +187,45 @@ ORDER BY analysis_date
 #### 分析任务 2：高峰时段分析 (peak_hour.py)
 
 **Spark 编程要点**：
-- 对 orders 表增加 `hour` 列：`df.withColumn("hour", hour(col("create_time")))`
-- 按 `(DATE(create_time), hour)` 双重分组聚合
+- 统计数据覆盖天数 `total_days = orders_df.select(date_format(...)).distinct().count()`
+- 按 `HOUR(create_time)` 跨所有日期聚合，除以天数得日均订单量和日均销售额
+- 按日均订单量降序排列，识别峰值时段
 - 结果写入 peak_hour_analysis 表
 
 **核心 SparkSQL**：
 ```sql
 SELECT
-    DATE(create_time) AS analysis_date,
+    CURRENT_DATE AS analysis_date,
     HOUR(create_time) AS hour,
-    COUNT(*) AS order_count,
-    SUM(total_amount) AS total_amount
+    COUNT(*) / (SELECT COUNT(DISTINCT DATE(create_time)) FROM orders WHERE is_deleted = 0) AS order_count,
+    SUM(total_amount) / (SELECT COUNT(DISTINCT DATE(create_time)) FROM orders WHERE is_deleted = 0) AS total_amount
 FROM orders
-WHERE status IN (2, 3)
-GROUP BY DATE(create_time), HOUR(create_time)
-ORDER BY analysis_date, hour
+WHERE is_deleted = 0
+GROUP BY HOUR(create_time)
+ORDER BY order_count DESC
 ```
 
 #### 分析任务 3：菜品销量分析 (dish_sales.py)
 
 **Spark 编程要点**：
 - JOIN orders 和 order_item 两张表
-- 按 `(DATE(orders.create_time), dish_id, dish_name)` 分组聚合
-- 使用 `orderBy(col("sales_count").desc()).limit(10)` 取 TOP 10
-- 使用 `DataFrame.write.mode("overwrite")` 覆盖当天已有分析结果
+- 统计数据覆盖天数用于计算日均值
+- 按 `(dish_id, dish_name)` 跨所有日期聚合，除以天数得日均销量和日均销售额
+- 使用 `row_number().over(Window.orderBy(sales_count.desc()))` 取全局 TOP 10
+- 结果写入 dish_sales_analysis 表
 
 **核心 SparkSQL (TOP10)**：
 ```sql
 SELECT
-    DATE(o.create_time) AS analysis_date,
+    CURRENT_DATE AS analysis_date,
     oi.dish_id,
     oi.dish_name,
-    SUM(oi.quantity) AS sales_count,
-    SUM(oi.quantity * oi.dish_price) AS sales_amount
+    SUM(oi.quantity) / (SELECT COUNT(DISTINCT DATE(create_time)) FROM orders WHERE is_deleted = 0) AS sales_count,
+    SUM(oi.quantity * oi.dish_price) / (SELECT COUNT(DISTINCT DATE(create_time)) FROM orders WHERE is_deleted = 0) AS sales_amount
 FROM order_item oi
 JOIN orders o ON oi.order_id = o.id
-WHERE o.status IN (2, 3)
-GROUP BY DATE(o.create_time), oi.dish_id, oi.dish_name
+WHERE o.is_deleted = 0
+GROUP BY oi.dish_id, oi.dish_name
 ORDER BY sales_count DESC
 LIMIT 10
 ```
@@ -231,27 +233,34 @@ LIMIT 10
 #### 分析任务 4：备餐预测 (meal_prediction.py)
 
 **Spark 编程要点**：
-- 读取 dish_sales_analysis 历史数据
-- 使用 `Window.partitionBy("dish_id").orderBy("analysis_date").rowsBetween(-6, 0)` 定义 7 天滑动窗口
-- 使用 `avg()` 窗口函数计算 7 日移动平均作为预测值
+- 直接从 orders + order_item 原始数据读取，先按 `(DATE, dish_id)` 聚合得到每日销量
+- 使用 `Window.partitionBy("dish_id").orderBy("analysis_date")` + `lag()` 获取前 7 天销量
+- 计算 7 日移动平均作为预测值，取最近一天数据预测下一天
 - `建议备餐量 = 预测销量 * 1.2`（20% 安全冗余）
-- 写入 meal_prediction 表
+- 使用 `mode("overwrite")` + `truncate` 覆盖写入 meal_prediction 表
 
 **关键 Spark 代码结构**：
 ```python
 from pyspark.sql.window import Window
 
-window_spec = Window.partitionBy("dish_id") \
-    .orderBy("analysis_date") \
-    .rowsBetween(-6, 0)
+# 先按日期+菜品聚合每日销量
+daily_sales_df = joined_df.groupBy(
+    date_format(col("o.create_time"), "yyyy-MM-dd").alias("analysis_date"),
+    col("oi.dish_id"),
+    col("oi.dish_name")
+).agg(sum(col("oi.quantity")).alias("sales_count"))
 
-prediction_df = dish_sales_df.withColumn(
-    "predicted_sales",
-    ceil(avg("sales_count").over(window_spec))
-).withColumn(
-    "suggested_prepare",
-    ceil(col("predicted_sales") * 1.2)
-)
+# 用 lag 获取前 7 天销量，计算移动平均
+window_spec = Window.partitionBy("dish_id").orderBy("analysis_date")
+sales_df = daily_sales_df \
+    .withColumn("prev_1", lag("sales_count", 1).over(window_spec)) \
+    ...
+    .withColumn("moving_avg", (col("prev_1") + ... + col("prev_7")) / 7)
+
+# 取最近有数据的一天，预测下一天
+prediction_df = sales_df.filter(col("analysis_date") == base_date) \
+    .withColumn("predict_date", to_date(lit(predict_date_str))) \
+    .withColumn("suggested_prepare", (col("moving_avg") * 1.2).cast("int"))
 ```
 
 ### 2.2.3 数据库连接配置

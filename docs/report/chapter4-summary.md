@@ -55,25 +55,28 @@ orders_df = spark.read.jdbc(
 #### 窗口函数实现备餐预测
 
 ```python
-from pyspark.sql.functions import col, avg, ceil
+from pyspark.sql.functions import col, lag, lit, to_date
 from pyspark.sql.window import Window
 
-# 7 天滑动窗口
-window_spec = Window.partitionBy("dish_id") \
-    .orderBy("analysis_date") \
-    .rowsBetween(-6, 0)
+# 从原始数据按天聚合后，使用 lag 获取前 7 天销量
+window_spec = Window.partitionBy("dish_id").orderBy("analysis_date")
+daily_sales_df = daily_sales_df \
+    .withColumn("prev_1", lag("sales_count", 1).over(window_spec)) \
+    .withColumn("prev_2", lag("sales_count", 2).over(window_spec)) \
+    ... \
+    .withColumn("moving_avg", (col("prev_1") + ... + col("prev_7")) / 7)
 
-# 计算 7 日移动平均作为预测值
-prediction_df = dish_sales_df \
-    .withColumn("predicted_sales", ceil(avg("sales_count").over(window_spec))) \
-    .withColumn("suggested_prepare", ceil(col("predicted_sales") * 1.2))
+# 取最近一天预测下一天
+prediction_df = daily_sales_df.filter(col("analysis_date") == base_date) \
+    .withColumn("predict_date", to_date(lit(predict_date_str))) \
+    .withColumn("suggested_prepare", (col("moving_avg") * 1.2).cast("int"))
 
-# 写入 MySQL
+# 覆盖写入 MySQL
 prediction_df.write.jdbc(
     url="jdbc:mysql://localhost:3306/smart_canteen",
     table="meal_prediction",
-    mode="append",
-    properties=db_properties
+    mode="overwrite",
+    properties={"truncate": "true", **db_properties}
 )
 ```
 

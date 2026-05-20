@@ -155,9 +155,9 @@ pyspark-analysis/
 **各分析任务实现要点**：
 
 - **客流分析**：`DATE(create_time)` 提取日期 → `groupBy("analysis_date").agg(count(), sum(), countDistinct())` → 写入 customer_flow_analysis 表
-- **高峰时段分析**：`withColumn("hour", hour(col("create_time")))` → 按 (日期, 小时) 双重分组 → 写入 peak_hour_analysis 表
-- **菜品销量分析**：orders JOIN order_item → 按 (日期, dish_id) 分组 → `orderBy desc limit 10` 取 TOP10 → 写入 dish_sales_analysis 表
-- **备餐预测**：读取历史销量数据 → `Window.rowsBetween(-6, 0)` 定义 7 天滑动窗口 → `avg().over(window)` 计算移动平均 → 建议备餐量 = 预测值 × 1.2 → 写入 meal_prediction 表
+- **高峰时段分析**：`hour(col("create_time"))` 提取小时 → 跨所有日期按小时聚合 → 除以数据覆盖天数得日均值 → 按日均订单量降序写入 peak_hour_analysis 表
+- **菜品销量分析**：orders JOIN order_item → 跨所有日期按 dish_id 聚合 → 除以天数得日均销量和日均销售额 → `row_number().over(Window.orderBy(...))` 取全局 TOP10 → 写入 dish_sales_analysis 表
+- **备餐预测**：直接从 orders + order_item 原始数据按天聚合 → `lag()` 获取前 7 天销量 → 计算 7 日移动平均 → 取最近一天预测下一天 → 建议备餐量 = 预测值 × 1.2 → 覆盖写入 meal_prediction 表
 
 **依赖**：PySpark 3.x、MySQL JDBC 驱动 (`mysql-connector-j`)，JDBC jar 需放入 Spark 的 jars 目录或通过 `--jars` 参数指定。
 
