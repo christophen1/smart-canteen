@@ -19,7 +19,7 @@ public class DishSalesAnalysis {
     private LocalDate analysisDate;
     private Long dishId;
     private String dishName;
-    private Integer salesCount;
+    private BigDecimal salesCount;
     private BigDecimal salesAmount;
     private LocalDateTime createTime;
 }

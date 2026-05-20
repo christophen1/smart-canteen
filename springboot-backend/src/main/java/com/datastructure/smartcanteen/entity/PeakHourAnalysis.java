@@ -18,7 +18,7 @@ public class PeakHourAnalysis {
 
     private LocalDate analysisDate;
     private Integer hour;
-    private Integer orderCount;
+    private BigDecimal orderCount;
     private BigDecimal totalAmount;
     private LocalDateTime createTime;
 }

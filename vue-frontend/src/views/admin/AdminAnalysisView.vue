@@ -98,30 +98,30 @@ const configs = {
   },
   'peak-hour': {
     title: '高峰时段识别',
-    chartTitle: '分小时订单峰值',
+    chartTitle: '各时段日均订单量',
     metric: '高峰时段',
     hint: '定位窗口备餐和排队压力最大的时间段',
-    tableTitle: '小时客流明细',
-    desc: '按小时统计订单量和销售额，定位午餐、晚餐的排队压力时段。',
+    tableTitle: '时段客流明细',
+    desc: '跨所有日期按小时取日均订单量与销售额，识别午/晚餐的高峰时段。',
     columns: [
-      { prop: 'analysisDate', label: '日期' },
+      { prop: 'analysisDate', label: '分析日期' },
       { prop: 'hour', label: '小时' },
-      { prop: 'orderCount', label: '订单量' },
-      { prop: 'totalAmount', label: '销售额' },
+      { prop: 'orderCount', label: '日均订单量' },
+      { prop: 'totalAmount', label: '日均销售额' },
     ],
   },
   'dish-sales': {
     title: '热门菜品 TOP10',
-    chartTitle: '菜品销量排行',
+    chartTitle: '菜品日均销量排行',
     metric: '销量排行',
     hint: '识别近期热销菜品和补货重点',
     tableTitle: '菜品销量明细',
-    desc: '按菜品统计销量和销售额，帮助窗口安排热销菜品备餐。',
+    desc: '跨所有日期取日均销量与销售额，展示 TOP10 畅销菜品。',
     columns: [
-      { prop: 'analysisDate', label: '日期' },
+      { prop: 'analysisDate', label: '分析日期' },
       { prop: 'dishName', label: '菜品' },
-      { prop: 'salesCount', label: '销量' },
-      { prop: 'salesAmount', label: '销售额' },
+      { prop: 'salesCount', label: '日均销量' },
+      { prop: 'salesAmount', label: '日均销售额' },
     ],
   },
   prediction: {
@@ -164,14 +164,15 @@ function normalize(data) {
 
 function renderChart() {
   if (!chartRef.value || rows.value.length === 0) return
-  if (!chart) chart = echarts.init(chartRef.value)
+  // 每次都重新初始化，避免 ECharts 实例挂在已销毁的 DOM 上导致空白
+  disposeChart()
+  chart = echarts.init(chartRef.value)
 
-  // 构建唯一的 X 轴标签（带日期前缀，避免多天数据标签重复）
   let xData
   if (props.type === 'peak-hour') {
-    xData = rows.value.map((r) => `${r._d} ${r._h}`)
+    xData = rows.value.map((r) => r._h)
   } else if (props.type === 'dish-sales') {
-    xData = rows.value.map((r) => `${r._d}\n${r.dishName}`)
+    xData = rows.value.map((r) => r.dishName)
   } else if (props.type === 'prediction') {
     xData = rows.value.map((r) => r.dishName)
   } else {
@@ -206,16 +207,25 @@ async function load() {
         params.endDate = dateRange.value[1]
       }
     }
-    rows.value = normalize(await api.analysis(props.type, params))
-  } catch {
+    const data = await api.analysis(props.type, params)
+    rows.value = normalize(data)
+  } catch (e) {
+    console.error('分析数据加载失败:', e)
     rows.value = []
   }
   await nextTick()
   if (rows.value.length === 0) {
-    chart?.clear()
+    disposeChart()
   } else {
     renderChart()
   }
+}
+
+function disposeChart() {
+  if (chart && !chart.isDisposed()) {
+    chart.dispose()
+  }
+  chart = null
 }
 
 watch(() => props.type, load)
@@ -225,13 +235,16 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', () => chart?.resize())
-  chart?.dispose()
-  chart = null
+  disposeChart()
 })
 </script>
 
 <style scoped>
-.chart-empty {
+.chart {
+  width: 100%;
+  height: 420px;
+}
+.chart.chart-empty {
   display: flex;
   align-items: center;
   justify-content: center;

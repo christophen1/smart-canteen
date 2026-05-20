@@ -218,10 +218,10 @@ com.datastructure.smartcanteen
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | BIGINT | PK, AUTO_INCREMENT | 主键 |
-| analysis_date | DATE | NOT NULL | 分析日期 |
+| analysis_date | DATE | NOT NULL | 分析运行日期 |
 | hour | INT | NOT NULL | 小时（0-23） |
-| order_count | INT | DEFAULT 0 | 订单数 |
-| total_amount | DECIMAL(10,2) | DEFAULT 0 | 总金额 |
+| order_count | DECIMAL(10,2) | DEFAULT 0 | 日均订单数 |
+| total_amount | DECIMAL(10,2) | DEFAULT 0 | 日均销售额 |
 | create_time | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
 
 #### 4.3.7 dish_sales_analysis（菜品销量分析结果表）
@@ -229,11 +229,11 @@ com.datastructure.smartcanteen
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | BIGINT | PK, AUTO_INCREMENT | 主键 |
-| analysis_date | DATE | NOT NULL | 分析日期 |
+| analysis_date | DATE | NOT NULL | 分析运行日期 |
 | dish_id | BIGINT | NOT NULL | 菜品ID |
 | dish_name | VARCHAR(100) | NOT NULL | 菜品名 |
-| sales_count | INT | DEFAULT 0 | 销量 |
-| sales_amount | DECIMAL(10,2) | DEFAULT 0 | 销售额 |
+| sales_count | DECIMAL(10,2) | DEFAULT 0 | 日均销量 |
+| sales_amount | DECIMAL(10,2) | DEFAULT 0 | 日均销售额 |
 | create_time | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
 
 #### 4.3.8 customer_flow_analysis（客流分析结果表）
@@ -396,20 +396,20 @@ pyspark-analysis/
 #### 高峰时段分析（peak_hour.py）
 
 - 输入：orders 表
-- 逻辑：按 `DATE(create_time) + HOUR(create_time)` 分组，统计每小时的订单量和总金额
-- 输出：写入 `peak_hour_analysis` 表
+- 逻辑：按 `HOUR(create_time)` 跨所有日期聚合，除以数据覆盖天数得到日均值，按订单量降序排列
+- 输出：写入 `peak_hour_analysis` 表（14 行，8:00-21:00 各一行）
 
 #### 菜品销量分析（dish_sales.py）
 
-- 输入：order_item 表（关联 orders 的 create_time）
-- 逻辑：按 `DATE(orders.create_time) + dish_id` 分组，统计销量和销售额，取 TOP10
-- 输出：写入 `dish_sales_analysis` 表
+- 输入：order_item 表（关联 orders）
+- 逻辑：按 `dish_id` 跨所有日期聚合，除以数据覆盖天数得到日均销量和销售额，取全局 TOP10
+- 输出：写入 `dish_sales_analysis` 表（10 行）
 
 #### 备餐预测（meal_prediction.py）
 
-- 输入：`dish_sales_analysis` 表的历史数据
-- 逻辑：基于过去 N 天的销量数据，使用移动平均或简单时序模型预测未来销量；建议备餐量 = 预测销量 × 1.2（安全系数）
-- 输出：写入 `meal_prediction` 表
+- 输入：orders + order_item 原始数据
+- 逻辑：先按日期+菜品聚合得到每日销量，再通过 7 日滞后窗口计算移动平均，取最近一天数据预测下一天；建议备餐量 = 预测销量 × 1.2（安全系数）
+- 输出：写入 `meal_prediction` 表（覆盖全部菜品，~30 行）
 
 ### 7.4 执行方式
 

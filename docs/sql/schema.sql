@@ -92,10 +92,10 @@ CREATE TABLE IF NOT EXISTS order_item (
 -- ============================================
 CREATE TABLE IF NOT EXISTS peak_hour_analysis (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-    analysis_date DATE NOT NULL COMMENT '分析日期',
+    analysis_date DATE NOT NULL COMMENT '分析运行日期',
     hour INT NOT NULL COMMENT '小时（0-23）',
-    order_count INT DEFAULT 0 COMMENT '订单数',
-    total_amount DECIMAL(10,2) DEFAULT 0 COMMENT '总金额',
+    order_count DECIMAL(10,2) DEFAULT 0 COMMENT '日均订单数',
+    total_amount DECIMAL(10,2) DEFAULT 0 COMMENT '日均销售额',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_analysis_date (analysis_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='高峰时段分析结果表';
@@ -105,11 +105,11 @@ CREATE TABLE IF NOT EXISTS peak_hour_analysis (
 -- ============================================
 CREATE TABLE IF NOT EXISTS dish_sales_analysis (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-    analysis_date DATE NOT NULL COMMENT '分析日期',
+    analysis_date DATE NOT NULL COMMENT '分析运行日期',
     dish_id BIGINT NOT NULL COMMENT '菜品ID',
     dish_name VARCHAR(100) NOT NULL COMMENT '菜品名',
-    sales_count INT DEFAULT 0 COMMENT '销量',
-    sales_amount DECIMAL(10,2) DEFAULT 0 COMMENT '销售额',
+    sales_count DECIMAL(10,2) DEFAULT 0 COMMENT '日均销量',
+    sales_amount DECIMAL(10,2) DEFAULT 0 COMMENT '日均销售额',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_analysis_date (analysis_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='菜品销量分析结果表';
