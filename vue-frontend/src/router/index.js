@@ -53,6 +53,10 @@ router.beforeEach((to) => {
     return true
   }
   if (to.meta.auth && !token) return to.path.startsWith('/admin') ? '/admin/login' : '/login'
+  if (to.meta.admin) {
+    const user = JSON.parse(localStorage.getItem('smart_user') || 'null')
+    if (!user || user.role !== 1) return '/home'
+  }
   return true
 })
 

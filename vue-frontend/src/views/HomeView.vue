@@ -13,7 +13,7 @@
           <el-button :icon="SwitchButton" @click="logout">退出</el-button>
         </template>
         <el-button v-else type="primary" :icon="User" @click="$router.push('/login')">登录</el-button>
-        <el-button type="primary" plain :icon="DataAnalysis" @click="$router.push('/admin/dashboard')">经营看板</el-button>
+        <el-button v-if="user?.role === 1" type="primary" plain :icon="DataAnalysis" @click="$router.push('/admin/dashboard')">经营看板</el-button>
       </el-space>
     </header>
 
