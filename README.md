@@ -52,7 +52,8 @@ mysql -u root -p < docs/sql/schema.sql
 
 ```bash
 python scripts/generate_data.py     # 生成 data.sql
-mysql -u root -p < scripts/data.sql # 导入数据
+cmd /c "mysql -u root -p < scripts\data.sql"# 导入数据
+Get-Content -Encoding UTF8 scripts/data.sql | mysql -u root -p                                                                                                                                                                                                                                      
 ```
 
 ### 4. 配置环境变量

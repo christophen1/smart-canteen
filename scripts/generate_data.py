@@ -23,7 +23,7 @@ random.seed(42)
 
 OUTPUT = "scripts/data.sql"
 DAYS = 90
-START_DATE = datetime(2026, 1, 1)
+START_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=DAYS)
 
 # ============================================================
 # 数据池
@@ -96,8 +96,19 @@ def generate():
     with open(OUTPUT, "w", encoding="utf-8") as f:
         f.write("-- Smart Canteen 测试数据集\n")
         f.write(f"-- 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write("-- 数据范围: 2026-01-01 ~ 2026-03-31 (90天)\n\n")
+        f.write(f"-- 数据范围: {START_DATE.strftime('%Y-%m-%d')} ~ {datetime.now().strftime('%Y-%m-%d')} (最近{DAYS}天)\n\n")
+        f.write("SET NAMES utf8mb4;\n")
         f.write("USE smart_canteen;\n\n")
+        f.write("-- 清空旧数据\n")
+        f.write("DELETE FROM order_item;\n")
+        f.write("DELETE FROM orders;\n")
+        f.write("DELETE FROM dish;\n")
+        f.write("DELETE FROM category;\n")
+        f.write("DELETE FROM user;\n")
+        f.write("ALTER TABLE user AUTO_INCREMENT = 1;\n")
+        f.write("ALTER TABLE category AUTO_INCREMENT = 1;\n")
+        f.write("ALTER TABLE dish AUTO_INCREMENT = 1;\n")
+        f.write("ALTER TABLE orders AUTO_INCREMENT = 1;\n\n")
 
         # ============================================================
         # 1. user
@@ -116,9 +127,9 @@ def generate():
             phone = f"138{random.randint(10000000, 99999999)}"
             users.append((i, username, role))
 
-            write(f, "INSERT INTO user (id, username, password, real_name, phone, role, status, create_time) VALUES")
-            write(f, "(%d, '%s', '%s', '%s', '%s', %d, 1, '%s');",
-                  i, username, pwd, real_name, phone, role,
+            write(f, "INSERT INTO user (username, password, real_name, phone, role, status, create_time) VALUES")
+            write(f, "('%s', '%s', '%s', '%s', %d, 1, '%s');",
+                  username, pwd, real_name, phone, role,
                   START_DATE.strftime('%Y-%m-%d %H:%M:%S'))
 
         f.write("\n")
@@ -130,8 +141,8 @@ def generate():
         f.write("-- 分类数据\n")
         f.write("-- ============================================\n")
         for sort_order, (cid, name) in enumerate(CATEGORIES, 1):
-            write(f, "INSERT INTO category (id, name, sort) VALUES (%d, '%s', %d);",
-                  cid, name, sort_order)
+            write(f, "INSERT INTO category (name, sort) VALUES ('%s', %d);",
+                  name, sort_order)
         f.write("\n")
 
         # ============================================================
@@ -141,8 +152,8 @@ def generate():
         f.write("-- 菜品数据 (%d个)\n" % len(DISHES))
         f.write("-- ============================================\n")
         for did, (cid, name, price) in enumerate(DISHES, 1):
-            write(f, "INSERT INTO dish (id, category_id, name, price, status) VALUES (%d, %d, '%s', %.2f, 1);",
-                  did, cid, name, price)
+            write(f, "INSERT INTO dish (category_id, name, price, status) VALUES (%d, '%s', %.2f, 1);",
+                  cid, name, price)
         f.write("\n")
 
         # ============================================================
@@ -184,18 +195,24 @@ def generate():
                 picked = random.sample(list(enumerate(DISHES, 1)), min(item_count, len(DISHES)))
                 picked = picked[:item_count]
 
-                total_amount = sum(dprice for _, (_, _, dprice) in picked)
+                # 先确定每个菜品的数量，再算总金额（单价 × 数量）
+                items = []
+                total_amount = 0
+                for did, (_, dname, dprice) in picked:
+                    qty = random.choices([1, 2, 3], weights=[60, 30, 10])[0]
+                    items.append((did, dname, dprice, qty))
+                    total_amount += dprice * qty
+
                 order_no = f"{date.strftime('%Y%m%d')}{uuid.uuid4().hex[:12].upper()}"
 
                 # 状态分布: 大部分已完成，少量待支付/已取消
                 status = random.choices([0, 1, 2, 3], weights=[5, 10, 15, 70])[0]
 
-                write(f, "INSERT INTO orders (id, order_no, user_id, total_amount, status, create_time) VALUES")
-                write(f, "(%d, '%s', %d, %.2f, %d, '%s');",
-                      order_id, order_no, user_id, total_amount, status, order_time)
+                write(f, "INSERT INTO orders (order_no, user_id, total_amount, status, create_time) VALUES")
+                write(f, "('%s', %d, %.2f, %d, '%s');",
+                      order_no, user_id, total_amount, status, order_time)
 
-                for did, (_, dname, dprice) in picked:
-                    qty = random.choices([1, 2, 3], weights=[60, 30, 10])[0]
+                for did, dname, dprice, qty in items:
                     write(f, "INSERT INTO order_item (order_id, dish_id, dish_name, dish_price, quantity, create_time) VALUES")
                     write(f, "(%d, %d, '%s', %.2f, %d, '%s');",
                           order_id, did, dname, dprice, qty, order_time)
